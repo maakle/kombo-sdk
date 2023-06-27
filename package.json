@@ -1,6 +1,6 @@
 {
   "name": "@maakle/kombo-sdk",
-  "version": "1.0.9",
+  "version": "1.1.1",
   "description": "This is an unofficial Typescript SDK for the Kombo.dev API",
   "main": "dist/Api.js",
   "scripts": {
