@@ -28,8 +28,12 @@ export interface GetCheckApiKeyErrorResponse {
 
 export interface PostForceSyncSuccessfulResponse {
   status: "success";
+  /** @example {"already_queued":false,"sync_id":"119ihtp91nA3dqRFiV67nXS6"} */
   data: {
+    /** We only allow 1 concurrent sync to be running or queued.  */
     already_queued: boolean;
+    /** ID of the newly-created or already-queued-or-running sync.  */
+    sync_id: string;
   };
 }
 
@@ -42,10 +46,10 @@ export interface PostForceSyncErrorResponse {
 
 export type PostForceSyncRequestBody = object;
 
-/** The ID of the tool whose pass-through API you want to call (e.g., `personio`). */
+/** The ID of the tool whose passthrough API you want to call (e.g., `personio`). */
 export type PostPassthroughToolApiParameterTool = string;
 
-/** The ID of the pass-through API you want to call (some tools provide multiple). Check the endpoint description for a list of all available APIs. */
+/** The ID of the passthrough API you want to call (some tools provide multiple). Check the endpoint description for a list of all available APIs. */
 export type PostPassthroughToolApiParameterApi = string;
 
 export interface PostPassthroughToolApiSuccessfulResponse {
@@ -92,11 +96,39 @@ export type PostPassthroughToolApiRequestBody = {
   path: string;
   /** The headers to send with the request. Note that we automatically supply any authentication-related headers. */
   headers?: Record<string, string>;
+  /** The query parameters to send in addition to the ones in the `path`. */
+  params?: Record<string, string>;
   /**
    * The data to submit as part of the request body. This can either be an array or object (in which case we will forward it as JSON) or a string (in which case we will forward it raw).
    * @format any
    */
   data?: any;
+  /** The data to submit as part of the request body if the request's `Content-Type` is `multipart/form-data`. */
+  multipart_form_data?: {
+    /** The key of the form data */
+    name: string;
+    /** The value of the form data (Can be an object if the field is of the type file) */
+    value:
+      | string
+      | {
+          /** Name of the file you want to upload. */
+          name: string;
+          /**
+           * Content/MIME type of the file (e.g., `application/pdf`). This is required if you provide `data` and optional if you provide `data_url`.
+           * @pattern /^[\w.-]+\/[\w.-]+$/
+           */
+          content_type?: string;
+          /** Base64-encoded contents of the file you want to upload. You must provide either this or `data_url`. */
+          data?: string;
+          /**
+           * Publicly accessible URL to the file you want to upload. You must provide either this or `data`.
+           * @format url
+           */
+          data_url?: string;
+        };
+  }[];
+  /** Custom options interpreted by the passthrough API adapter you've selected. These options are not documented right now as they're only for very advanced use cases. */
+  api_options?: Record<string, string>;
 };
 
 export type DeleteIntegrationsIntegrationIdParameterIntegrationId = string;
@@ -119,7 +151,7 @@ export type GetIntegrationsIntegrationIdParameterIntegrationId = string;
 
 export interface GetIntegrationsIntegrationIdSuccessfulResponse {
   status: "success";
-  /** @example {"id":"factorial:8d1hpPsbjxUkoCoa1veLZGe5","tool":{"id":"factorial","label":"Factorial","logo_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/logo.svg","icon_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg"},"category":"HRIS","status":"ACTIVE","end_user":{"organization_name":"Acme","creator_email":"example-integration-creator@acme.com","origin_id":"2DQJAUtSzzzKP9buDTvUvPk3"},"created_at":"2022-08-07T14:01:29.196Z"} */
+  /** @example {"id":"factorial:8d1hpPsbjxUkoCoa1veLZGe5","tool":{"id":"factorial","label":"Factorial","logo_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/logo.svg","icon_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg"},"category":"HRIS","status":"ACTIVE","end_user":{"organization_name":"Acme","creator_email":"example-integration-creator@acme.com","origin_id":"2DQJAUtSzzzKP9buDTvUvPk3"},"scope_config":{"id":"B1hu5NGyhdjSq5X3hxEz4bAN","name":"Anonymous Scopes"},"created_at":"2022-08-07T14:01:29.196Z"} */
   data: {
     id: string;
     tool: {
@@ -137,7 +169,7 @@ export interface GetIntegrationsIntegrationIdSuccessfulResponse {
        */
       icon_url: string;
     };
-    category: "HRIS" | "ATS";
+    category: "HRIS" | "ATS" | "ASSESSMENT";
     status: "ACTIVE" | "INVALID" | "INACTIVE";
     end_user: {
       organization_name: string;
@@ -145,6 +177,10 @@ export interface GetIntegrationsIntegrationIdSuccessfulResponse {
       creator_email: string | null;
       /** The ID you have passed initially to the connection flow to create this integration. */
       origin_id: string | null;
+    };
+    scope_config: {
+      id: string;
+      name: string | null;
     };
     /**
      * YYYY-MM-DDTHH:mm:ss.sssZ
@@ -189,11 +225,12 @@ export type PostIntegrationsIntegrationIdRelinkRequestBody = {
 export enum GetToolsCategoryParameterCategory {
   Hris = "hris",
   Ats = "ats",
+  Assessment = "assessment",
 }
 
 export interface GetToolsCategorySuccessfulResponse {
   status: "success";
-  /** @example {"tools":[{"id":"factorial","label":"Factorial","assets":{"logo_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/logo.svg","icon_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg","icon_black_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/icon-black.svg"}}]} */
+  /** @example {"tools":[{"id":"factorial","label":"Factorial","assets":{"logo_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/logo.svg","icon_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg","icon_black_url":"https://storage.googleapis.com/kombo-assets/integrations/factorial/icon-black.svg"},"coverage":{"read_models":[{"id":"hris_employees","label":"Employees"},{"id":"hris_teams","label":"Groups"}],"write_actions":[{"id":"hris_create_employee","label":"Create employee"}],"features":[{"id":"automatic_source_writing","label":"Automatic Source Writing"}]}}]} */
   data: {
     tools: {
       id: string;
@@ -202,6 +239,21 @@ export interface GetToolsCategorySuccessfulResponse {
         logo_url: string;
         icon_url: string;
         icon_black_url: string;
+      };
+      /** This describes the supported models and actions of this tool. */
+      coverage: {
+        read_models: {
+          id: string;
+          label: string;
+        }[];
+        write_actions: {
+          id: string;
+          label: string;
+        }[];
+        features: {
+          id: string;
+          label: string;
+        }[];
       };
     }[];
   };
@@ -213,6 +265,145 @@ export interface GetToolsCategoryErrorResponse {
     message: string;
   };
 }
+
+/** ID of the provisioning group (currently only `default` is allowed). */
+export type PostHrisProvisioningGroupsGroupIdDiffParameterGroupId = string;
+
+export interface PostHrisProvisioningGroupsGroupIdDiffSuccessfulResponse {
+  status: "success";
+  /** The users to provision, deprovision, and optionally update. */
+  data: {
+    users: {
+      /** The users we've found in the HR systems who match the provisioning filters but haven't been provisioned in your system yet. */
+      to_provision: {
+        /**
+         * The email address of the user.
+         * @format email
+         */
+        email: string;
+        /** The field of the underlying employee (which ones are included depends on the `employee_fields` array you supplied). */
+        employee: {
+          id?: string;
+          remote_id?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          groups?: {
+            id: string;
+            remote_id: string | null;
+            name: string | null;
+          }[];
+          avatar?: string | null;
+          work_location_id?: string | null;
+          legal_entity_id?: string | null;
+        };
+      }[];
+      /** The users who've been provisioned in your system but couldn't be found in the HR system or don't match the provisioning filters. */
+      to_deprovision: {
+        /** _Your_ ID for this user (that you submitted through `origin_id`). */
+        origin_id: string;
+        /**
+         * The email address of the user.
+         * @format email
+         */
+        email: string;
+      }[];
+      /** The users who are in the HR system and match the provisioning filters but have already been provisioned in your system. */
+      already_provisioned: {
+        /** _Your_ ID for this user (that you submitted through `origin_id`). */
+        origin_id: string;
+        /**
+         * The email address of the user.
+         * @format email
+         */
+        email: string;
+        /** The field of the underlying employee (which ones are included depends on the `employee_fields` array you supplied). */
+        employee: {
+          id?: string;
+          remote_id?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+          groups?: {
+            id: string;
+            remote_id: string | null;
+            name: string | null;
+          }[];
+          avatar?: string | null;
+          work_location_id?: string | null;
+          legal_entity_id?: string | null;
+        };
+      }[];
+    };
+  };
+}
+
+export interface PostHrisProvisioningGroupsGroupIdDiffErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PostHrisProvisioningGroupsGroupIdDiffRequestBody = {
+  /** Array of the already provisioned users in your system. */
+  provisioned_users: {
+    /** _Your_ ID for this user (_not_ an ID retrieved from Kombo). */
+    origin_id: string;
+    /**
+     * This user's email address.
+     * @format email
+     */
+    email: string;
+  }[];
+  /** Options to customize what we return. */
+  options: {
+    /** The employee fields relevant for your use case. */
+    employee_fields: (
+      | "id"
+      | "remote_id"
+      | "first_name"
+      | "last_name"
+      | "groups"
+      | "avatar"
+      | "work_location_id"
+      | "legal_entity_id"
+    )[];
+  };
+};
+
+/** ID of the provisioning group (currently only `default` is allowed). */
+export type PostHrisProvisioningGroupsGroupIdSetupLinksParameterGroupId = string;
+
+export interface PostHrisProvisioningGroupsGroupIdSetupLinksSuccessfulResponse {
+  status: "success";
+  /** @example {"url":"https://connect.kombo.dev/v1/provisioning?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.SWYgeW91IGFyZSByZWFkaW5nIHRoaXMsIHdlIHdvdWxkIGxpa2UgdG8gbGV0IHlvdSBrbm93IHRoYXQgd2UgYXJlIGhpcmluZyBwZW9wbGUgbGlrZSB5b3UgOikuIFJlYWNoIG91dCB0byBhbGV4QGtvbWJvLmRldiB0byBnZXQgaW4gY29udGFjdCBhbmQgdGVsbCBoaW0geW91IGNvbWUgZnJvbSB0aGUgSldUIDsp._hhX5YTtHfLn9ZC806dZceRn2whzxHyrhft1ONzNgOE","expires_at":"2023-10-11T12:00:00.000Z"} */
+  data: {
+    /**
+     * The setup link URL to pass to the Kombo Connect SDK.
+     * @format url
+     */
+    url: string;
+    /**
+     * When this link expires.
+     * @format date-time
+     */
+    expires_at: string;
+  };
+}
+
+export interface PostHrisProvisioningGroupsGroupIdSetupLinksErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PostHrisProvisioningGroupsGroupIdSetupLinksRequestBody = {
+  /**
+   * Language of the UI. Please note that the provisioning setup UI is _not_ translated yet but we're working on it and setting this already will make sure the translations appear once released.
+   * @default "en"
+   */
+  language?: "en" | "de" | "fr";
+};
 
 /** An optional cursor string used for pagination. This can be retrieved from the `next` property of the previous page response. */
 export type GetHrisEmployeesParameterCursor = string;
@@ -229,7 +420,7 @@ export type GetHrisEmployeesParameterCursor = string;
 export type GetHrisEmployeesParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -244,16 +435,13 @@ export enum GetHrisEmployeesParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisEmployeesParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
 export type GetHrisEmployeesParameterRemoteIds = string;
 
-/** Filter by the `employment_status` field. */
+/** **(⚠️ Deprecated - Use the `employment_statuses` filter instead.)** Filter by the `employment_status` field. */
 export enum GetHrisEmployeesParameterEmploymentStatus {
   ACTIVE = "ACTIVE",
   PENDING = "PENDING",
@@ -261,15 +449,33 @@ export enum GetHrisEmployeesParameterEmploymentStatus {
   LEAVE = "LEAVE",
 }
 
-/** Filter by a comma-separated list of group IDs. We will return all employees that are members of _any_ of the groups. */
+/**
+ * Filter by a comma-separated list of `ACTIVE`, `PENDING`, `INACTIVE`, `LEAVE`
+ * * `ACTIVE`: the employee is **actively employed**
+ * * `PENDING`: the employee is **not actively employed yet** (but they signed their contract or are part of an onboarding process)
+ * * `INACTIVE`: a full-time employee is no longer employed, or, for a contract worker when their contract runs out
+ * * `LEAVE`: the employee is still employed but **currently on leave** (note that not all HR systems support this status — use our absences API for detailed information)
+ */
+export type GetHrisEmployeesParameterEmploymentStatuses = string;
+
+/** Filter by a comma-separated list of group IDs. We will only return employees that are members of _any_ of the groups. */
 export type GetHrisEmployeesParameterGroupIds = string;
 
-/** Filter by a comma-separated list of legal entity IDs. We will return all employees that are members of _any_ of the legal entities. */
+/** Filter by a comma-separated list of legal entity IDs. We will only return employees that are members of _any_ of the legal entities. */
 export type GetHrisEmployeesParameterLegalEntityIds = string;
+
+/** Filter by a comma-separated list of work location IDs. We will only return employees who are at _any_ of the work locations. */
+export type GetHrisEmployeesParameterWorkLocationIds = string;
+
+/** Filter by a comma-separated list of work emails. We will only return employees who have _any_ of the work emails. */
+export type GetHrisEmployeesParameterWorkEmails = string;
+
+/** Filter by a comma-separated list of personal emails. We will only return employees who have _any_ of the personal emails. */
+export type GetHrisEmployeesParameterPersonalEmails = string;
 
 export interface GetHrisEmployeesSuccessfulResponse {
   status: "success";
-  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","employee_number":"3243422","first_name":"John","last_name":"Doe","nationality":"French","display_full_name":"John Doe","job_title":"Integrations Team Lead","work_email":"john.doe@acme.com","personal_email":"john@doe.me","mobile_phone_number":"801-555-4687","ssn":"555-32-6395","tax_id":"12 345 678 901","gender":"MALE","ethnicity":"BLACK_AFRICAN_AMERICAN","marital_status":"MARRIED","employment_status":"INACTIVE","employment_type":"FULL_TIME","avatar":"https://resources.bamboohr.com/images/photo_person_150x150.png","work_location_id":"7E2gyuv6TmvtByzBxW9Sxt53","legal_entity_id":"xB32bied320csBSsl3XWdlw33","manager_id":"9pf2pxBB8VX8EQMC9aipW2Bo","home_address":{"city":"Berlin","country":"DE","raw":"Sonnenallee 63\n12045 Berlin\nGermany","state":"Berlin","street_1":"Sonnenallee 63","street_2":null,"zip_code":"12045"},"bank_accounts":[{"account_number":"1234567890","bank_name":"Commerzbank","bic":"COBADEFFXXX","holder_name":"John Doe","iban":"DE12345678901234567890"}],"date_of_birth":"1986-01-01T00:00:00.000Z","start_date":"2020-04-07T00:00:00.000Z","termination_date":"2022-05-20T00:00:00.000Z","remote_created_at":"2020-04-07T12:32:01.000Z","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"custom_fields":{},"remote_data":null,"employments":[{"id":"12vpXR7BeqYNWDShXRgsonnm","remote_id":"859","employee_id":"8Xk99QfVKYA6vfEafEUBdEPJ","job_title":"Social Media Marketer","pay_rate":85000,"pay_period":"YEAR","pay_frequency":"SEMIMONTHLY","pay_currency":"EUR","effective_date":"2021-01-30T00:00:00.000Z","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"remote_data":null}],"time_off_balances":[{"id":"FuyRuk5NqP3qTcThED3ymTuE","remote_id":"124123","employee_id":"2Up4ZCvq1bFVzmzXG6EWzV3j","type_id":"BQJaBxRCiqN46G27VTegvkEr","balance":14,"balance_unit":"DAYS","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"used":3,"used_unit":"DAYS","remote_data":null}],"manager":{"first_name":"John","last_name":"Doe","id":"26vafvWSRmbhNcxJYqjCzuJg","work_email":"john.doe@acme.com","remote_id":"32"},"groups":[{"id":"4B9bKBpX5tnwjiG93TAqF7ci","remote_id":"49","name":"Customer Success","type":"TEAM"}],"legal_entity":{"id":"4B9bKBpX5tnwjiG93TAqF7ci","remote_id":"49","name":"ACME Inc.","address":{"city":"Berlin","country":"DE","raw":"Sonnenallee 63\n12045 Berlin, Berlin\nGermany","state":"Berlin","street_1":"Sonnenallee 63","street_2":null,"zip_code":"12045"}},"teams":[{"id":"4B9bKBpX5tnwjiG93TAqF7ci","remote_id":"49","name":"Customer Success","type":"TEAM"}],"work_location":{"id":"22st2Ji8XpncEYEak8mvQgQF","remote_id":"1348","name":"Kombo HQ","address":{"city":"Berlin","country":"DE","raw":"Sonnenallee 63\n12045 Berlin, Berlin\nGermany","state":"Berlin","street_1":"Sonnenallee 63","street_2":null,"zip_code":"12045"},"type":"OFFICE","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":"2022-08-07T14:01:29.196Z","remote_data":null}}]} */
+  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","employee_number":"3243422","first_name":"John","last_name":"Doe","nationality":"French","display_full_name":"John Doe","job_title":"Integrations Team Lead","work_email":"john.doe@acme.com","personal_email":"john@doe.me","mobile_phone_number":"801-555-4687","ssn":"555-32-6395","tax_id":"12 345 678 901","gender":"MALE","ethnicity":"BLACK_AFRICAN_AMERICAN","marital_status":"MARRIED","employment_status":"INACTIVE","employment_type":"FULL_TIME","avatar":"https://resources.bamboohr.com/images/photo_person_150x150.png","work_location_id":"7E2gyuv6TmvtByzBxW9Sxt53","legal_entity_id":"xB32bied320csBSsl3XWdlw33","manager_id":"9pf2pxBB8VX8EQMC9aipW2Bo","home_address":{"city":"Berlin","country":"DE","raw":"Sonnenallee 63\n12045 Berlin\nGermany","state":"Berlin","street_1":"Sonnenallee 63","street_2":null,"zip_code":"12045"},"bank_accounts":[{"account_number":"1234567890","bank_name":"Commerzbank","bic":"COBADEFFXXX","holder_name":"John Doe","iban":"DE12345678901234567890"}],"date_of_birth":"1986-01-01T00:00:00.000Z","start_date":"2020-04-07T00:00:00.000Z","termination_date":"2022-05-20T00:00:00.000Z","remote_created_at":"2020-04-07T12:32:01.000Z","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"custom_fields":{},"remote_data":null,"employments":[{"id":"12vpXR7BeqYNWDShXRgsonnm","remote_id":"859","employee_id":"8Xk99QfVKYA6vfEafEUBdEPJ","job_title":"Social Media Marketer","pay_rate":85000,"pay_period":"YEAR","pay_frequency":"SEMIMONTHLY","employment_type":"FULL_TIME","pay_currency":"EUR","effective_date":"2021-01-30T00:00:00.000Z","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"remote_data":null}],"time_off_balances":[{"id":"FuyRuk5NqP3qTcThED3ymTuE","remote_id":"124123","employee_id":"2Up4ZCvq1bFVzmzXG6EWzV3j","type_id":"BQJaBxRCiqN46G27VTegvkEr","balance":14,"balance_unit":"DAYS","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"used":3,"used_unit":"DAYS","remote_data":null}],"manager":{"first_name":"John","last_name":"Doe","id":"26vafvWSRmbhNcxJYqjCzuJg","work_email":"john.doe@acme.com","remote_id":"32"},"groups":[{"id":"4B9bKBpX5tnwjiG93TAqF7ci","remote_id":"49","name":"Customer Success","type":"TEAM"}],"legal_entity":{"id":"4B9bKBpX5tnwjiG93TAqF7ci","remote_id":"49","name":"ACME Inc.","address":{"city":"Berlin","country":"DE","raw":"Sonnenallee 63\n12045 Berlin, Berlin\nGermany","state":"Berlin","street_1":"Sonnenallee 63","street_2":null,"zip_code":"12045"}},"teams":[{"id":"4B9bKBpX5tnwjiG93TAqF7ci","remote_id":"49","name":"Customer Success","type":"TEAM"}],"work_location":{"id":"22st2Ji8XpncEYEak8mvQgQF","remote_id":"1348","name":"Kombo HQ","address":{"city":"Berlin","country":"DE","raw":"Sonnenallee 63\n12045 Berlin, Berlin\nGermany","state":"Berlin","street_1":"Sonnenallee 63","street_2":null,"zip_code":"12045"},"type":"OFFICE","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":"2022-08-07T14:01:29.196Z","remote_data":null}}]} */
   data: {
     /** Cursor string that can be passed to the `cursor` query parameter to get the next page. If this is `null`, then there are no more pages. */
     next: string | null;
@@ -329,7 +535,16 @@ export interface GetHrisEmployeesSuccessfulResponse {
         | "NOT_MARRIED"
         | string
         | null;
-      /** One of 4 standardized values (`ACTIVE`, `PENDING`, `INACTIVE`, or `LEAVE`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
+      /**
+       * The current employment status of the employee:
+       *
+       * - `ACTIVE`: the employee is **actively employed**
+       * - `PENDING`: the employee is **not actively employed yet** (but they signed their contract or are part of an onboarding process)
+       * - `INACTIVE`: the employee is **not actively employed** anymore
+       * - `LEAVE`: the employee is still employed but **currently on leave** (note that not all HR systems support this status — use our absences API for detailed information)
+       *
+       * Please note that in rare cases, where we can't find a clear mapping, the original string is passed through.
+       */
       employment_status: "ACTIVE" | "PENDING" | "INACTIVE" | "LEAVE" | string | null;
       /** One of 8 standardized values (`FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`, `FREELANCE`, `WORKING_STUDENT`, `APPRENTICESHIP`, or `TRAINING`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
       employment_type:
@@ -358,11 +573,17 @@ export interface GetHrisEmployeesSuccessfulResponse {
          * @default null
          */
         country?: string | null;
-        /** @default null */
+        /**
+         * If we have address data, this is filled with the raw address string.
+         * @default null
+         */
         raw?: string | null;
         /** @default null */
         state?: string | null;
-        /** @default null */
+        /**
+         * If we can parse the address data, this field contains the first part of the street information.
+         * @default null
+         */
         street_1?: string | null;
         /** @default null */
         street_2?: string | null;
@@ -407,7 +628,7 @@ export interface GetHrisEmployeesSuccessfulResponse {
        */
       start_date: string | null;
       /**
-       * The where the employment ends. Can be in the past or future.
+       * The date when the employment ends. Can be in the past or future.
        * @format date-time
        */
       termination_date: string | null;
@@ -457,8 +678,9 @@ export interface GetHrisEmployeesSuccessfulResponse {
           | "YEAR"
           | string
           | null;
-        /** One of 8 standardized values (`WEEKLY`, `BIWEEKLY`, `MONTHLY`, `SEMIMONTHLY`, `QUARTERLY`, `SEMIANNUALLY`, `ANNUALLY`, or `PRO_RATA`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
+        /** One of 9 standardized values (`DAILY`, `WEEKLY`, `BIWEEKLY`, `MONTHLY`, `SEMIMONTHLY`, `QUARTERLY`, `SEMIANNUALLY`, `ANNUALLY`, or `PRO_RATA`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
         pay_frequency:
+          | "DAILY"
           | "WEEKLY"
           | "BIWEEKLY"
           | "MONTHLY"
@@ -467,6 +689,18 @@ export interface GetHrisEmployeesSuccessfulResponse {
           | "SEMIANNUALLY"
           | "ANNUALLY"
           | "PRO_RATA"
+          | string
+          | null;
+        /** One of 8 standardized values (`FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`, `FREELANCE`, `WORKING_STUDENT`, `APPRENTICESHIP`, or `TRAINING`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
+        employment_type:
+          | "FULL_TIME"
+          | "PART_TIME"
+          | "CONTRACT"
+          | "INTERNSHIP"
+          | "FREELANCE"
+          | "WORKING_STUDENT"
+          | "APPRENTICESHIP"
+          | "TRAINING"
           | string
           | null;
         /** Pay currency usually returned in [ISO 4217 currency codes](https://www.iso.org/iso-4217-currency-codes.html). */
@@ -494,6 +728,7 @@ export interface GetHrisEmployeesSuccessfulResponse {
         employee_id: string;
         type_id: string;
         /**
+         * The amount time available to the employee.
          * @format double
          * @min 5e-324
          * @exclusiveMin false
@@ -561,11 +796,17 @@ export interface GetHrisEmployeesSuccessfulResponse {
            * @default null
            */
           country?: string | null;
-          /** @default null */
+          /**
+           * If we have address data, this is filled with the raw address string.
+           * @default null
+           */
           raw?: string | null;
           /** @default null */
           state?: string | null;
-          /** @default null */
+          /**
+           * If we can parse the address data, this field contains the first part of the street information.
+           * @default null
+           */
           street_1?: string | null;
           /** @default null */
           street_2?: string | null;
@@ -573,7 +814,7 @@ export interface GetHrisEmployeesSuccessfulResponse {
           zip_code?: string | null;
         };
       };
-      /** **(⚠️ Deprecated)** Please use the `groups` field. It includes the same data and the naming is less confusing. */
+      /** **(⚠️ Deprecated - Please use `groups` instead.  It includes the same data and the naming is less confusing.)** Maintained field for backwards compatibility. */
       teams: {
         id: string;
         remote_id: string;
@@ -594,11 +835,17 @@ export interface GetHrisEmployeesSuccessfulResponse {
            * @default null
            */
           country?: string | null;
-          /** @default null */
+          /**
+           * If we have address data, this is filled with the raw address string.
+           * @default null
+           */
           raw?: string | null;
           /** @default null */
           state?: string | null;
-          /** @default null */
+          /**
+           * If we can parse the address data, this field contains the first part of the street information.
+           * @default null
+           */
           street_1?: string | null;
           /** @default null */
           street_2?: string | null;
@@ -688,7 +935,16 @@ export interface PostHrisEmployeesSuccessfulResponse {
       | "NOT_MARRIED"
       | string
       | null;
-    /** One of 4 standardized values (`ACTIVE`, `PENDING`, `INACTIVE`, or `LEAVE`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
+    /**
+     * The current employment status of the employee:
+     *
+     * - `ACTIVE`: the employee is **actively employed**
+     * - `PENDING`: the employee is **not actively employed yet** (but they signed their contract or are part of an onboarding process)
+     * - `INACTIVE`: the employee is **not actively employed** anymore
+     * - `LEAVE`: the employee is still employed but **currently on leave** (note that not all HR systems support this status — use our absences API for detailed information)
+     *
+     * Please note that in rare cases, where we can't find a clear mapping, the original string is passed through.
+     */
     employment_status: "ACTIVE" | "PENDING" | "INACTIVE" | "LEAVE" | string | null;
     /** One of 8 standardized values (`FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`, `FREELANCE`, `WORKING_STUDENT`, `APPRENTICESHIP`, or `TRAINING`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
     employment_type:
@@ -717,11 +973,17 @@ export interface PostHrisEmployeesSuccessfulResponse {
        * @default null
        */
       country?: string | null;
-      /** @default null */
+      /**
+       * If we have address data, this is filled with the raw address string.
+       * @default null
+       */
       raw?: string | null;
       /** @default null */
       state?: string | null;
-      /** @default null */
+      /**
+       * If we can parse the address data, this field contains the first part of the street information.
+       * @default null
+       */
       street_1?: string | null;
       /** @default null */
       street_2?: string | null;
@@ -766,7 +1028,7 @@ export interface PostHrisEmployeesSuccessfulResponse {
      */
     start_date: string | null;
     /**
-     * The where the employment ends. Can be in the past or future.
+     * The date when the employment ends. Can be in the past or future.
      * @format date-time
      */
     termination_date: string | null;
@@ -806,7 +1068,7 @@ export type PostHrisEmployeesRequestBody = {
   gender?: "MALE" | "FEMALE" | "NON_BINARY" | "NOT_SPECIFIED";
   /** Title of the position this person is working in. */
   job_title?: string;
-  /** Nested object of the home address. */
+  /** The employee's home address. */
   home_address?: {
     street_1?: string;
     street_2?: string;
@@ -814,23 +1076,44 @@ export type PostHrisEmployeesRequestBody = {
     state?: string;
     zip_code?: string;
     /**
-     * The uppercase two-letter ISO country (e.g., `DE`) of the applicant. For systems that have other formats than `ISO 3166-1 alpha-2` codes, Kombo transforms the ISO Codes to the appropriate value.
+     * The uppercase two-letter ISO country (e.g., `DE`) of the employee's home address. For systems that have other formats than `ISO 3166-1 alpha-2` codes, Kombo transforms the ISO Codes to the appropriate value.
      * @pattern /^[A-Z]{2}$/
      */
     country?: string;
   };
   /**
-   * YYYY-MM-DDTHH:mm:ss.sssZ
+   * The employee's date of birth. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded.
    * @format date-time
    * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
    */
   date_of_birth?: string;
+  mobile_phone_number?: string;
   /**
-   * Start date of the employee. Also considered to be the hire date.
+   * The uppercase two-letter ISO country (e.g., `DE`) of the employee's nationality. For systems that have other formats than `ISO 3166-1 alpha-2` codes, Kombo transforms the ISO Codes to the appropriate value.
+   * @pattern /^[A-Z]{2}$/
+   */
+  nationality?: string;
+  /**
+   * Start date of the employee. Also considered to be the hire date. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded.
    * @format date-time
    * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
    */
   start_date?: string;
+  /** Additional fields that we will pass through to specific HRIS systems. */
+  remote_fields?: {
+    /** Fields specific to Humaans. */
+    humaans?: {
+      /** Fields that we will pass through to Humaans `Employee` object. */
+      employee?: Record<string, any>;
+    };
+    /** Fields specific to Silae. */
+    silae: {
+      /** Fields that we will passed through to Silae `Employee` object. */
+      employee?: Record<string, any>;
+      /** Fields that we will passed through to Silae `Employment` object. */
+      employment?: Record<string, any>;
+    };
+  };
 };
 
 /** ID of the employee that should be updated. You can use their Kombo `id` or their ID in the remote system by prefixing it with `remote:` (e.g., `remote:12312`) */
@@ -895,7 +1178,16 @@ export interface PatchHrisEmployeesEmployeeIdSuccessfulResponse {
       | "NOT_MARRIED"
       | string
       | null;
-    /** One of 4 standardized values (`ACTIVE`, `PENDING`, `INACTIVE`, or `LEAVE`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
+    /**
+     * The current employment status of the employee:
+     *
+     * - `ACTIVE`: the employee is **actively employed**
+     * - `PENDING`: the employee is **not actively employed yet** (but they signed their contract or are part of an onboarding process)
+     * - `INACTIVE`: the employee is **not actively employed** anymore
+     * - `LEAVE`: the employee is still employed but **currently on leave** (note that not all HR systems support this status — use our absences API for detailed information)
+     *
+     * Please note that in rare cases, where we can't find a clear mapping, the original string is passed through.
+     */
     employment_status: "ACTIVE" | "PENDING" | "INACTIVE" | "LEAVE" | string | null;
     /** One of 8 standardized values (`FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`, `FREELANCE`, `WORKING_STUDENT`, `APPRENTICESHIP`, or `TRAINING`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
     employment_type:
@@ -924,11 +1216,17 @@ export interface PatchHrisEmployeesEmployeeIdSuccessfulResponse {
        * @default null
        */
       country?: string | null;
-      /** @default null */
+      /**
+       * If we have address data, this is filled with the raw address string.
+       * @default null
+       */
       raw?: string | null;
       /** @default null */
       state?: string | null;
-      /** @default null */
+      /**
+       * If we can parse the address data, this field contains the first part of the street information.
+       * @default null
+       */
       street_1?: string | null;
       /** @default null */
       street_2?: string | null;
@@ -973,7 +1271,7 @@ export interface PatchHrisEmployeesEmployeeIdSuccessfulResponse {
      */
     start_date: string | null;
     /**
-     * The where the employment ends. Can be in the past or future.
+     * The date when the employment ends. Can be in the past or future.
      * @format date-time
      */
     termination_date: string | null;
@@ -1013,7 +1311,7 @@ export type PatchHrisEmployeesEmployeeIdRequestBody = {
   gender?: "MALE" | "FEMALE" | "NON_BINARY" | "NOT_SPECIFIED";
   /** Title of the position this person is working in. */
   job_title?: string;
-  /** Nested object of the home address. */
+  /** The employee's home address. */
   home_address?: {
     street_1?: string;
     street_2?: string;
@@ -1021,36 +1319,62 @@ export type PatchHrisEmployeesEmployeeIdRequestBody = {
     state?: string;
     zip_code?: string;
     /**
-     * The uppercase two-letter ISO country (e.g., `DE`) of the applicant. For systems that have other formats than `ISO 3166-1 alpha-2` codes, Kombo transforms the ISO Codes to the appropriate value.
+     * The uppercase two-letter ISO country (e.g., `DE`) of the employee's home address. For systems that have other formats than `ISO 3166-1 alpha-2` codes, Kombo transforms the ISO Codes to the appropriate value.
      * @pattern /^[A-Z]{2}$/
      */
     country?: string;
   };
   /**
-   * YYYY-MM-DDTHH:mm:ss.sssZ
+   * The employee's date of birth. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded.
    * @format date-time
    * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
    */
   date_of_birth?: string;
+  mobile_phone_number?: string;
   /**
-   * Start date of the employee. Also considered to be the hire date.
+   * The uppercase two-letter ISO country (e.g., `DE`) of the employee's nationality. For systems that have other formats than `ISO 3166-1 alpha-2` codes, Kombo transforms the ISO Codes to the appropriate value.
+   * @pattern /^[A-Z]{2}$/
+   */
+  nationality?: string;
+  /**
+   * Start date of the employee. Also considered to be the hire date. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded.
    * @format date-time
    * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
    */
   start_date?: string;
+  /** Additional fields that we will pass through to specific HRIS systems. */
+  remote_fields?: {
+    /** Fields specific to Humaans. */
+    humaans?: {
+      /** Fields that we will pass through to Humaans `Employee` object. */
+      employee?: Record<string, any>;
+    };
+    /** Fields specific to Silae. */
+    silae: {
+      /** Fields that we will passed through to Silae `Employee` object. */
+      employee?: Record<string, any>;
+      /** Fields that we will passed through to Silae `Employment` object. */
+      employment?: Record<string, any>;
+    };
+  };
 } & {
   /** Social security number of the employee. */
   ssn?: string;
   /** Marital status of an employee. */
   marital_status?: "SINGLE" | "MARRIED" | "DOMESTIC_PARTNERSHIP" | "WIDOWED" | "DIVORCED" | "SEPARATED" | "NOT_MARRIED";
   /**
-   * Date on which the employment ends.
+   * Date on which the employment ends. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded.
    * @format date-time
    * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
    */
   termination_date?: string;
   /** Tax ID of the employee. Most contries have different formats of that. In Germany, this is the `Steuer ID` and in the US it's the `TIN`. */
   tax_id?: string;
+  /**
+   * The uppercase two-letter ISO country (e.g., `DE`) of the employee's nationality. For systems that have other formats than `ISO 3166-1 alpha-2` codes, Kombo transforms the ISO Codes to the appropriate value.
+   * @pattern /^[A-Z]{2}$/
+   */
+  nationality?: string;
 };
 
 export type PostHrisEmployeesEmployeeIdAttachmentsParameterEmployeeId = string;
@@ -1084,7 +1408,7 @@ export type GetHrisTeamsParameterCursor = string;
 export type GetHrisTeamsParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1099,10 +1423,7 @@ export enum GetHrisTeamsParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisTeamsParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -1157,7 +1478,7 @@ export type GetHrisGroupsParameterCursor = string;
 export type GetHrisGroupsParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1172,10 +1493,7 @@ export enum GetHrisGroupsParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisGroupsParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -1230,7 +1548,7 @@ export type GetHrisEmploymentsParameterCursor = string;
 export type GetHrisEmploymentsParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1245,10 +1563,7 @@ export enum GetHrisEmploymentsParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisEmploymentsParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -1256,7 +1571,7 @@ export type GetHrisEmploymentsParameterRemoteIds = string;
 
 export interface GetHrisEmploymentsSuccessfulResponse {
   status: "success";
-  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"12vpXR7BeqYNWDShXRgsonnm","remote_id":"859","employee_id":"8Xk99QfVKYA6vfEafEUBdEPJ","job_title":"Social Media Marketer","pay_rate":85000,"pay_period":"YEAR","pay_frequency":"SEMIMONTHLY","pay_currency":"EUR","effective_date":"2021-01-30T00:00:00.000Z","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"remote_data":null}]} */
+  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"12vpXR7BeqYNWDShXRgsonnm","remote_id":"859","employee_id":"8Xk99QfVKYA6vfEafEUBdEPJ","job_title":"Social Media Marketer","pay_rate":85000,"pay_period":"YEAR","pay_frequency":"SEMIMONTHLY","employment_type":"FULL_TIME","pay_currency":"EUR","effective_date":"2021-01-30T00:00:00.000Z","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"remote_data":null}]} */
   data: {
     /** Cursor string that can be passed to the `cursor` query parameter to get the next page. If this is `null`, then there are no more pages. */
     next: string | null;
@@ -1288,8 +1603,9 @@ export interface GetHrisEmploymentsSuccessfulResponse {
         | "YEAR"
         | string
         | null;
-      /** One of 8 standardized values (`WEEKLY`, `BIWEEKLY`, `MONTHLY`, `SEMIMONTHLY`, `QUARTERLY`, `SEMIANNUALLY`, `ANNUALLY`, or `PRO_RATA`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
+      /** One of 9 standardized values (`DAILY`, `WEEKLY`, `BIWEEKLY`, `MONTHLY`, `SEMIMONTHLY`, `QUARTERLY`, `SEMIANNUALLY`, `ANNUALLY`, or `PRO_RATA`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
       pay_frequency:
+        | "DAILY"
         | "WEEKLY"
         | "BIWEEKLY"
         | "MONTHLY"
@@ -1298,6 +1614,18 @@ export interface GetHrisEmploymentsSuccessfulResponse {
         | "SEMIANNUALLY"
         | "ANNUALLY"
         | "PRO_RATA"
+        | string
+        | null;
+      /** One of 8 standardized values (`FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`, `FREELANCE`, `WORKING_STUDENT`, `APPRENTICESHIP`, or `TRAINING`) **or** — in rare cases where can't find a clear mapping — the original string passed through. */
+      employment_type:
+        | "FULL_TIME"
+        | "PART_TIME"
+        | "CONTRACT"
+        | "INTERNSHIP"
+        | "FREELANCE"
+        | "WORKING_STUDENT"
+        | "APPRENTICESHIP"
+        | "TRAINING"
         | string
         | null;
       /** Pay currency usually returned in [ISO 4217 currency codes](https://www.iso.org/iso-4217-currency-codes.html). */
@@ -1344,7 +1672,7 @@ export type GetHrisLocationsParameterCursor = string;
 export type GetHrisLocationsParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1359,10 +1687,7 @@ export enum GetHrisLocationsParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisLocationsParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -1386,11 +1711,17 @@ export interface GetHrisLocationsSuccessfulResponse {
          * @default null
          */
         country?: string | null;
-        /** @default null */
+        /**
+         * If we have address data, this is filled with the raw address string.
+         * @default null
+         */
         raw?: string | null;
         /** @default null */
         state?: string | null;
-        /** @default null */
+        /**
+         * If we can parse the address data, this field contains the first part of the street information.
+         * @default null
+         */
         street_1?: string | null;
         /** @default null */
         street_2?: string | null;
@@ -1435,7 +1766,7 @@ export type GetHrisAbsenceTypesParameterCursor = string;
 export type GetHrisAbsenceTypesParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1450,10 +1781,7 @@ export enum GetHrisAbsenceTypesParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisAbsenceTypesParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -1511,7 +1839,7 @@ export type GetHrisTimeOffBalancesParameterCursor = string;
 export type GetHrisTimeOffBalancesParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1526,10 +1854,7 @@ export enum GetHrisTimeOffBalancesParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisTimeOffBalancesParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -1550,6 +1875,7 @@ export interface GetHrisTimeOffBalancesSuccessfulResponse {
       employee_id: string;
       type_id: string;
       /**
+       * The amount time available to the employee.
        * @format double
        * @min 5e-324
        * @exclusiveMin false
@@ -1627,7 +1953,7 @@ export type GetHrisAbsencesParameterCursor = string;
 export type GetHrisAbsencesParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1642,41 +1968,41 @@ export enum GetHrisAbsencesParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisAbsencesParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
 export type GetHrisAbsencesParameterRemoteIds = string;
 
 /**
- * Filter for all the absences that either start _or_ haven't ended yet on/after this day. If you imagine a calendar displaying absences, this defines the left-most visible day.
+ * Filter for all the absences that either start _or_ haven't ended yet on/after this day. If you imagine a calendar displaying absences, this defines the left-most visible day. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
 export type GetHrisAbsencesParameterDateFrom = string;
 
 /**
- * Filter for absences that start on or before this day (but might continue after). If you imagine a calendar displaying absences, this defines the right-most visible day.
+ * Filter for absences that start on or before this day (but might continue after). If you imagine a calendar displaying absences, this defines the right-most visible day. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
 export type GetHrisAbsencesParameterDateUntil = string;
 
+/** Filter by a comma-separated list of absence type IDs. */
+export type GetHrisAbsencesParameterTypeIds = string;
+
 /** Filter by a specific employee using their ID. */
 export type GetHrisAbsencesParameterEmployeeId = string;
 
 /**
- * **(⚠️ Deprecated)** Filter for absences that either start after or start before and end after a certain time. Please use `date_from` instead.
+ * **(⚠️ Deprecated - Use the `date_from` filter instead.)** Filter for absences that either start after or start before and end after a certain time.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
 export type GetHrisAbsencesParameterTimeFrom = string;
 
 /**
- * **(⚠️ Deprecated)** Filter for absences that start before a certain time. Please use `date_until` instead.
+ * **(⚠️ Deprecated - Use the `date_until` filter instead.)** Filter for absences that start before a certain time.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1694,7 +2020,7 @@ export interface GetHrisAbsencesSuccessfulResponse {
       /** The raw ID of the object in the remote system. We don't recommend using this as a primary key on your side as it might sometimes be compromised of multiple identifiers if a system doesn't provide a clear primary key. */
       remote_id: string | null;
       employee_id: string;
-      /** **(⚠️ Deprecated)** The ID of the employee who is responsible for approving this absence. */
+      /** **(⚠️ Deprecated - We won't increase coverage for this feature)** The ID of the employee who is responsible for approving this absence. */
       approver_id: string | null;
       /** The date this absence starts in the `yyyy-MM-dd` format. */
       start_date: string | null;
@@ -1779,7 +2105,7 @@ export interface PostHrisAbsencesSuccessfulResponse {
     /** The raw ID of the object in the remote system. We don't recommend using this as a primary key on your side as it might sometimes be compromised of multiple identifiers if a system doesn't provide a clear primary key. */
     remote_id: string | null;
     employee_id: string;
-    /** **(⚠️ Deprecated)** The ID of the employee who is responsible for approving this absence. */
+    /** **(⚠️ Deprecated - We won't increase coverage for this feature)** The ID of the employee who is responsible for approving this absence. */
     approver_id: string | null;
     /** The date this absence starts in the `yyyy-MM-dd` format. */
     start_date: string | null;
@@ -1900,7 +2226,7 @@ export interface DeleteHrisAbsencesAbsenceIdSuccessfulResponse {
     /** The raw ID of the object in the remote system. We don't recommend using this as a primary key on your side as it might sometimes be compromised of multiple identifiers if a system doesn't provide a clear primary key. */
     remote_id: string | null;
     employee_id: string;
-    /** **(⚠️ Deprecated)** The ID of the employee who is responsible for approving this absence. */
+    /** **(⚠️ Deprecated - We won't increase coverage for this feature)** The ID of the employee who is responsible for approving this absence. */
     approver_id: string | null;
     /** The date this absence starts in the `yyyy-MM-dd` format. */
     start_date: string | null;
@@ -1969,7 +2295,7 @@ export type GetHrisLegalEntitiesParameterCursor = string;
 export type GetHrisLegalEntitiesParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -1984,10 +2310,7 @@ export enum GetHrisLegalEntitiesParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetHrisLegalEntitiesParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -2013,11 +2336,17 @@ export interface GetHrisLegalEntitiesSuccessfulResponse {
          * @default null
          */
         country?: string | null;
-        /** @default null */
+        /**
+         * If we have address data, this is filled with the raw address string.
+         * @default null
+         */
         raw?: string | null;
         /** @default null */
         state?: string | null;
-        /** @default null */
+        /**
+         * If we can parse the address data, this field contains the first part of the street information.
+         * @default null
+         */
         street_1?: string | null;
         /** @default null */
         street_2?: string | null;
@@ -2061,7 +2390,7 @@ export type GetAtsApplicationsParameterCursor = string;
 export type GetAtsApplicationsParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -2076,18 +2405,32 @@ export enum GetAtsApplicationsParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetAtsApplicationsParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
 export type GetAtsApplicationsParameterRemoteIds = string;
 
+/** **(⚠️ Deprecated - Use the `outcomes` filter instead.)** Filter applications by outcome. This allows you to get applications that are for example `PENDING`, `HIRED`, or `DECLINED`. */
+export enum GetAtsApplicationsParameterOutcome {
+  PENDING = "PENDING",
+  HIRED = "HIRED",
+  DECLINED = "DECLINED",
+}
+
+/** Filter by a comma-separated list of `PENDING`, `HIRED`, `DECLINED`  */
+export type GetAtsApplicationsParameterOutcomes = string;
+
+/**
+ * Filter applications by the day they were created in the remote system. This allows you to get applications that were created on or after a certain day.
+ * @format date-time
+ * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
+ */
+export type GetAtsApplicationsParameterRemoteCreatedAfter = string;
+
 export interface GetAtsApplicationsSuccessfulResponse {
   status: "success";
-  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","outcome":"HIRED","current_stage_id":"5J7L4b48wBfffYwek9Az9pkM","job_id":"H5daSm8e85Dmvmne3wLeCPhX","candidate_id":"H77fDF8uvEzGNPRubiz5DvQ7","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"remote_data":null,"candidate":{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","first_name":"John","last_name":"Doe","email_addresses":[{"email_address":"john.doe@example.com","type":"PRIVATE"}],"tags":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"High Potential"}]},"current_stage":{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Initial Screening"},"job":{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Backend Engineer"}}]} */
+  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","outcome":"HIRED","rejection_reason_name":"Any text string","current_stage_id":"5J7L4b48wBfffYwek9Az9pkM","job_id":"H5daSm8e85Dmvmne3wLeCPhX","candidate_id":"H77fDF8uvEzGNPRubiz5DvQ7","changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"remote_created_at":"2022-08-07T14:01:29.196Z","remote_updated_at":"2022-08-07T14:01:29.196Z","remote_data":null,"candidate":{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","first_name":"John","last_name":"Doe","email_addresses":[{"email_address":"john.doe@example.com","type":"PRIVATE"}],"tags":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"High Potential"}]},"current_stage":{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Initial Screening"},"job":{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Backend Engineer"},"interviews":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","title":"Interview with John Doe","starting_at":"2023-06-26T14:30:00.000Z","ending_at":"2023-06-26T15:30:00.000Z","location":{"city":"Berlin","country":"DE","raw":"Berlin, Germany","state":"Berlin","street_1":"Lohmühlenstraße 65","street_2":null,"zip_code":"12435"}}]}]} */
   data: {
     /** Cursor string that can be passed to the `cursor` query parameter to get the next page. If this is `null`, then there are no more pages. */
     next: string | null;
@@ -2099,6 +2442,8 @@ export interface GetAtsApplicationsSuccessfulResponse {
        * Kombo will always try to deliver this infomation as reliably as possible.
        */
       outcome: "PENDING" | "HIRED" | "DECLINED" | null;
+      /** Reason for the rejection of the candidate. */
+      rejection_reason_name: string | null;
       /** ID of the current application stage */
       current_stage_id: string | null;
       job_id: string | null;
@@ -2113,6 +2458,16 @@ export interface GetAtsApplicationsSuccessfulResponse {
        * @format date-time
        */
       remote_deleted_at: string | null;
+      /**
+       * YYYY-MM-DDTHH:mm:ss.sssZ
+       * @format date-time
+       */
+      remote_created_at: string | null;
+      /**
+       * YYYY-MM-DDTHH:mm:ss.sssZ
+       * @format date-time
+       */
+      remote_updated_at: string | null;
       remote_data: Record<string, any>;
     } & {
       candidate: {
@@ -2154,6 +2509,50 @@ export interface GetAtsApplicationsSuccessfulResponse {
         /** Title of the job. */
         name: string | null;
       };
+      interviews: {
+        /** The globally unique Kombo ID of the interview. */
+        id: string;
+        /** The ID of the interview in the integrated system. */
+        remote_id: string | null;
+        /** The title of the interview. */
+        title: string | null;
+        /**
+         * The start time of the interview.
+         * @format date-time
+         */
+        starting_at: string | null;
+        /**
+         * The end time of the interview.
+         * @format date-time
+         */
+        ending_at: string | null;
+        /** Location of the interview. */
+        location: {
+          /** @default null */
+          city?: string | null;
+          /**
+           * Contains the ISO2 country code if possible. If not, it contains the original value.
+           * @default null
+           */
+          country?: string | null;
+          /**
+           * If we have address data, this is filled with the raw address string.
+           * @default null
+           */
+          raw?: string | null;
+          /** @default null */
+          state?: string | null;
+          /**
+           * If we can parse the address data, this field contains the first part of the street information.
+           * @default null
+           */
+          street_1?: string | null;
+          /** @default null */
+          street_2?: string | null;
+          /** @default null */
+          zip_code?: string | null;
+        };
+      }[];
     })[];
   };
 }
@@ -2238,6 +2637,41 @@ export type PostAtsApplicationsApplicationIdResultLinksRequestBody = {
   };
 };
 
+/** Kombo ID of the application you want to create the note for. */
+export type PostAtsApplicationsApplicationIdNotesParameterApplicationId = string;
+
+export interface PostAtsApplicationsApplicationIdNotesSuccessfulResponse {
+  status: "success";
+  data: object;
+}
+
+export interface PostAtsApplicationsApplicationIdNotesErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PostAtsApplicationsApplicationIdNotesRequestBody = {
+  /** UTF-8 content of the note. */
+  content: string;
+  /** Content type of the note. Currently only `PLAIN_TEXT` is supported. */
+  content_type: "PLAIN_TEXT";
+  /** Tool specific remote fields for the note. */
+  remote_fields?: {
+    /** Teamtailor specific remote fields for the note. */
+    teamtailor?: {
+      /** ID of the user that created the note. Defaults to the first admin user found. */
+      user_id?: string;
+    };
+    /** Greenhouse specific remote fields for the note. */
+    greenhouse?: {
+      /** Visibility of the created note. */
+      visibility?: "admin_only" | "private" | "public";
+    };
+  };
+};
+
 /** An optional cursor string used for pagination. This can be retrieved from the `next` property of the previous page response. */
 export type GetAtsCandidatesParameterCursor = string;
 
@@ -2253,7 +2687,7 @@ export type GetAtsCandidatesParameterCursor = string;
 export type GetAtsCandidatesParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -2268,18 +2702,21 @@ export enum GetAtsCandidatesParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetAtsCandidatesParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
 export type GetAtsCandidatesParameterRemoteIds = string;
 
+/**
+ * Filter the candidates based on an email address. When set, returns only the candidates where the given `email` is in `email_addresses`.
+ * @format email
+ */
+export type GetAtsCandidatesParameterEmail = string;
+
 export interface GetAtsCandidatesSuccessfulResponse {
   status: "success";
-  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","first_name":"John","last_name":"Doe","company":"Acme, Inc.","title":"Head of Marketing","confidential":false,"source":"Employee Referral","phone_numbers":[{"phone_number":"+1-541-754-3010","type":"HOME"}],"email_addresses":[{"email_address":"john.doe@example.com","type":"PRIVATE"}],"social_media":[{"link":"https://www.youtube.com/watch?v=dQw4w9WgXcQ","type":"YOUTUBE","username":null}],"location":{"city":"Berlin","country":"DE","raw":"Berlin, Germany","state":"Berlin","street_1":"Lohmühlenstraße 65","street_2":null,"zip_code":"12435"},"remote_created_at":"2022-04-02T00:00:00.000Z","remote_updated_at":"2022-04-04T00:00:00.000Z","remote_data":null,"changed_at":"2022-04-04T00:00:00.000Z","remote_deleted_at":null,"applications":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","current_stage":{"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"Initial Screening","remote_id":"32"},"job":{"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"Backend Engineer","remote_id":"32"}}],"tags":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"High Potential","remote_id":"32"}]}]} */
+  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","first_name":"John","last_name":"Doe","company":"Acme, Inc.","title":"Head of Marketing","confidential":false,"source":"Employee Referral","phone_numbers":[{"phone_number":"+1-541-754-3010","type":"HOME"}],"email_addresses":[{"email_address":"john.doe@example.com","type":"PRIVATE"}],"social_media":[{"link":"https://www.youtube.com/watch?v=dQw4w9WgXcQ","type":"YOUTUBE","username":null}],"location":{"city":"Berlin","country":"DE","raw":"Berlin, Germany","state":"Berlin","street_1":"Lohmühlenstraße 65","street_2":null,"zip_code":"12435"},"remote_created_at":"2022-04-02T00:00:00.000Z","remote_updated_at":"2022-04-04T00:00:00.000Z","remote_data":null,"changed_at":"2022-04-04T00:00:00.000Z","remote_deleted_at":null,"applications":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","outcome":"HIRED","rejection_reason_name":"Any text string","current_stage":{"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"Initial Screening","remote_id":"32"},"job":{"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"Backend Engineer","remote_id":"32"}}],"tags":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"High Potential","remote_id":"32"}]}]} */
   data: {
     /** Cursor string that can be passed to the `cursor` query parameter to get the next page. If this is `null`, then there are no more pages. */
     next: string | null;
@@ -2340,11 +2777,17 @@ export interface GetAtsCandidatesSuccessfulResponse {
          * @default null
          */
         country?: string | null;
-        /** @default null */
+        /**
+         * If we have address data, this is filled with the raw address string.
+         * @default null
+         */
         raw?: string | null;
         /** @default null */
         state?: string | null;
-        /** @default null */
+        /**
+         * If we can parse the address data, this field contains the first part of the street information.
+         * @default null
+         */
         street_1?: string | null;
         /** @default null */
         street_2?: string | null;
@@ -2376,6 +2819,13 @@ export interface GetAtsCandidatesSuccessfulResponse {
       applications: ({
         id: string;
         remote_id: string | null;
+        /**
+         * Parsed status of the application. If Kombo identifies that the application was accepted and the candidate hired, it will be `HIRED`. If the application was rejected or the candidate declined, it will be `DECLINED`. If the application is still in process, it will be `PENDING`.
+         * Kombo will always try to deliver this infomation as reliably as possible.
+         */
+        outcome: "PENDING" | "HIRED" | "DECLINED" | null;
+        /** Reason for the rejection of the candidate. */
+        rejection_reason_name: string | null;
       } & {
         /** @example {"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"Initial Screening","remote_id":"32"} */
         current_stage: {
@@ -2468,11 +2918,17 @@ export interface PostAtsCandidatesSuccessfulResponse {
        * @default null
        */
       country?: string | null;
-      /** @default null */
+      /**
+       * If we have address data, this is filled with the raw address string.
+       * @default null
+       */
       raw?: string | null;
       /** @default null */
       state?: string | null;
-      /** @default null */
+      /**
+       * If we can parse the address data, this field contains the first part of the street information.
+       * @default null
+       */
       street_1?: string | null;
       /** @default null */
       street_2?: string | null;
@@ -2504,6 +2960,13 @@ export interface PostAtsCandidatesSuccessfulResponse {
     applications: ({
       id: string;
       remote_id: string | null;
+      /**
+       * Parsed status of the application. If Kombo identifies that the application was accepted and the candidate hired, it will be `HIRED`. If the application was rejected or the candidate declined, it will be `DECLINED`. If the application is still in process, it will be `PENDING`.
+       * Kombo will always try to deliver this infomation as reliably as possible.
+       */
+      outcome: "PENDING" | "HIRED" | "DECLINED" | null;
+      /** Reason for the rejection of the candidate. */
+      rejection_reason_name: string | null;
     } & {
       /** @example {"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"Initial Screening","remote_id":"32"} */
       current_stage: {
@@ -2583,6 +3046,14 @@ export type PostAtsCandidatesRequestBody = {
        */
       amount: number;
     };
+    /**
+     * A list of social media links of the applicant. The links must be valid URLs.
+     * @default []
+     */
+    social_links?: {
+      /** @format url */
+      url: string;
+    }[];
   };
   /** Currently, every candidate has one application. If you are interested in talent pools, please contact Kombo. */
   application: {
@@ -2598,19 +3069,54 @@ export type PostAtsCandidatesRequestBody = {
    * @example [{"question_id":"D8yPrjXXvA2XeBksTmrVvKSn","answer":"Yes"}]
    */
   screening_question_answers?: {
-    /** ID of the question returned by the Kombo API. Will throw an error if the question is not connected to the job. */
+    /** ID of the question returned by the Kombo API. We'll report a warning in the logs if the question can't be found on the job. */
     question_id: string;
-    /** Answer to a question. This will be validated based on the question format and throw an error if the answer is invalid. */
-    answer: string | boolean | number | string[];
+    /**
+     * Answer to a question. This will be validated based on the question format and throw an error if the answer is invalid. Here is a description of each question type and the required answer format:
+     *
+     * `TEXT` - Simply provide a "string" answer.
+     *
+     * `SINGLE_SELECT` - Provide the ID of the answer as a string.
+     *
+     * `MULTI_SELECT` - Provide a string array containing the question IDs of the selected options.
+     *
+     * `BOOLEAN` - Either `true` or `false`.
+     *
+     * `NUMBER` - A number.
+     *
+     * `DATE` - Provide the answer as an ISO 8601 date string.
+     *
+     * `FILE` - Please select Option 6 in the dropdown above to see the required format.
+     */
+    answer:
+      | string
+      | boolean
+      | number
+      | string[]
+      | {
+          /** Name of the file you want to upload. */
+          name: string;
+          /**
+           * Content/MIME type of the file (e.g., `application/pdf`). This is required if you provide `data` and optional if you provide `data_url`.
+           * @pattern /^[\w.-]+\/[\w.-]+$/
+           */
+          content_type?: string;
+          /** Base64-encoded contents of the file you want to upload. You must provide either this or `data_url`. */
+          data?: string;
+          /**
+           * Publicly accessible URL to the file you want to upload. You must provide either this or `data`.
+           * @format url
+           */
+          data_url?: string;
+        };
   }[];
   /**
    * Array of the attachments you would like upload.
    * @default []
    */
-  attachments?: {
+  attachments?: ({
     /** Name of the file you want to upload. */
     name: string;
-    type: "CV" | "COVER_LETTER" | "OTHER";
     /**
      * Content/MIME type of the file (e.g., `application/pdf`). This is required if you provide `data` and optional if you provide `data_url`.
      * @pattern /^[\w.-]+\/[\w.-]+$/
@@ -2623,8 +3129,16 @@ export type PostAtsCandidatesRequestBody = {
      * @format url
      */
     data_url?: string;
-  }[];
-  /** Optional source information that will be attached to the candidate. If you're a job board or recruiting service, you can use this to make sure your customers can see which candidates came from you. */
+  } & {
+    type: "CV" | "COVER_LETTER" | "OTHER";
+  })[];
+  /**
+   * **(⚠️ Deprecated - Use [automatic source writing](/ats/features/application-attribution#automatic-attribution) instead)** Optional source information that will be attached to the candidate. If
+   * you're a job board or recruiting service, you can use this to make sure your
+   * customers can see which candidates came from you.
+   *
+   * This is deprecated because writing sources requires users to do some setup in most ATSs.
+   */
   source?: {
     /**
      * Name of the source (e.g., `"Example Job Board"`).
@@ -2652,6 +3166,25 @@ export type PostAtsCandidatesRequestBody = {
       Candidate?: Record<string, any>;
       /** Fields that we will pass through to SuccessFactor's `JobApplication` object. */
       JobApplication?: Record<string, any>;
+    };
+    teamtailor?: {
+      /** Fields that we will pass through to Teamtailor's `Candidate` object. */
+      candidate?: Record<string, any>;
+    };
+    /** Fields specific to Greenhouse. */
+    greenhouse?: {
+      /** Fields that we will pass through to Greenhouse's `Candidate` object. */
+      candidate?: Record<string, any>;
+    };
+    /** Fields specific to Lever. */
+    lever?: {
+      /** Fields that we will pass through to Lever's `Candidate` object. Note: make sure to submit the keys and values in the correct form data format. */
+      candidate?: Record<string, any>;
+    };
+    /** Fields specific to Workable. */
+    workable?: {
+      /** Fields that we will pass through to Workable's `Candidate` object. */
+      candidate?: Record<string, any>;
     };
   } & {
     /** Fields specific to Greenhouse. */
@@ -2702,7 +3235,6 @@ export type PostAtsCandidatesCandidateIdAttachmentsRequestBody = {
   attachment: {
     /** Name of the file you want to upload. */
     name: string;
-    type: "CV" | "COVER_LETTER" | "OTHER";
     /**
      * Content/MIME type of the file (e.g., `application/pdf`). This is required if you provide `data` and optional if you provide `data_url`.
      * @pattern /^[\w.-]+\/[\w.-]+$/
@@ -2715,6 +3247,8 @@ export type PostAtsCandidatesCandidateIdAttachmentsRequestBody = {
      * @format url
      */
     data_url?: string;
+  } & {
+    type: "CV" | "COVER_LETTER" | "OTHER";
   };
   /** Additional fields that we will pass through to specific ATS systems. */
   remote_fields?: {
@@ -2876,7 +3410,7 @@ export type GetAtsTagsParameterCursor = string;
 export type GetAtsTagsParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -2891,10 +3425,7 @@ export enum GetAtsTagsParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetAtsTagsParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -2947,7 +3478,7 @@ export type GetAtsApplicationStagesParameterCursor = string;
 export type GetAtsApplicationStagesParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -2962,10 +3493,7 @@ export enum GetAtsApplicationStagesParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetAtsApplicationStagesParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -3018,7 +3546,7 @@ export type GetAtsJobsParameterCursor = string;
 export type GetAtsJobsParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -3033,21 +3561,35 @@ export enum GetAtsJobsParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetAtsJobsParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
 export type GetAtsJobsParameterRemoteIds = string;
 
+/** Filter by a comma-separated list of job codes. */
+export type GetAtsJobsParameterJobCodes = string;
+
 /** Filter by the `post_url` field. Can be used to find a job based on its public posting URL. */
 export type GetAtsJobsParameterPostUrl = string;
 
+/** **(⚠️ Deprecated - Use the `statuses` filter instead.)** Filter by the `status` field. Can be used to find a job based on its status. */
+export enum GetAtsJobsParameterStatus {
+  OPEN = "OPEN",
+  CLOSED = "CLOSED",
+  DRAFT = "DRAFT",
+  ARCHIVED = "ARCHIVED",
+}
+
+/** Filter by a comma-separated list of `OPEN`, `CLOSED`, `DRAFT`, `ARCHIVED`  */
+export type GetAtsJobsParameterStatuses = string;
+
+/** Filter by the `name` field. Can be used to find a job by keywords present in the job name. */
+export type GetAtsJobsParameterNameContains = string;
+
 export interface GetAtsJobsSuccessfulResponse {
   status: "success";
-  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Backend Engineer","description":"<p>Kombo is hiring engineers! If you are reading this and you are located in Berlin, Germany, feel free to contact us about this position.</p>","confidential":false,"weekly_hours":37,"employment_type":"FULL_TIME","status":"OPEN","visibility":"PUBLIC","category":"Technical Job","department":"Engineering","post_url":"https://jobs.example.com/post/159829112","experience_level":"Mid-Senior","salary_amount":4200,"salary_amount_from":null,"salary_amount_to":null,"salary_currency":"EUR","salary_period":"MONTH","location":{"city":"Berlin","country":"DE","raw":"Berlin, Germany","state":"Berlin","street_1":"Lohmühlenstraße 65","street_2":null,"zip_code":"12435"},"opened_at":"2022-08-07T14:01:29.196Z","closed_at":null,"remote_created_at":"2022-08-07T14:01:29.196Z","remote_updated_at":"2022-08-07T14:01:29.196Z","contact_id":"6gT2yLMBEipd3zpezATv3Rhu","remote_data":null,"changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"stages":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Initial Screening","index":0}],"screening_questions":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"48b4d36a-1d4b-4c50-ada7-9519078e65b4","title":"Which is your primary programming language?","description":"Please enter the language you are most comfortable with.","format":{"display_type":"SINGLE_LINE","max_length":null,"type":"TEXT"},"index":0,"required":true}],"hiring_team":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","first_name":"John","last_name":"Doe","email":"john.doe@kombo.dev","hiring_team_roles":["RECRUITER"]}]}]} */
+  /** @example {"next":"eyJwYWdlIjoxMiwibm90ZSI6InRoaXMgaXMganVzdCBhbiBleGFtcGxlIGFuZCBub3QgcmVwcmVzZW50YXRpdmUgZm9yIGEgcmVhbCBjdXJzb3IhIn0=","results":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Backend Engineer","job_code":"BE-2021-01","description":"<p>Kombo is hiring engineers! If you are reading this and you are located in Berlin, Germany, feel free to contact us about this position.</p>","confidential":false,"weekly_hours":37,"employment_type":"FULL_TIME","status":"OPEN","visibility":"PUBLIC","category":"Technical Job","department":"Engineering","post_url":"https://jobs.example.com/post/159829112","experience_level":"Mid-Senior","remote_work_status":"HYBRID","salary_amount":4200,"salary_amount_from":null,"salary_amount_to":null,"salary_currency":"EUR","salary_period":"MONTH","location":{"city":"Berlin","country":"DE","raw":"Berlin, Germany","state":"Berlin","street_1":"Lohmühlenstraße 65","street_2":null,"zip_code":"12435"},"opened_at":"2022-08-07T14:01:29.196Z","closed_at":null,"remote_created_at":"2022-08-07T14:01:29.196Z","remote_updated_at":"2022-08-07T14:01:29.196Z","contact_id":"6gT2yLMBEipd3zpezATv3Rhu","remote_data":null,"changed_at":"2022-08-07T14:01:29.196Z","remote_deleted_at":null,"stages":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","name":"Initial Screening","index":0}],"screening_questions":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"48b4d36a-1d4b-4c50-ada7-9519078e65b4","title":"Which is your primary programming language?","description":"Please enter the language you are most comfortable with.","format":{"display_type":"SINGLE_LINE","max_length":null,"type":"TEXT"},"index":0,"required":true}],"job_postings":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"48b4d36a-1d4b-4c50-ada7-9519078e65b4","description_html":"<p>We are looking for a Frontend Engineer.</p>","status":"ACTIVE","visibility":"PUBLIC"}],"hiring_team":[{"id":"26vafvWSRmbhNcxJYqjCzuJg","remote_id":"32","first_name":"John","last_name":"Doe","email":"john.doe@kombo.dev","hiring_team_roles":["RECRUITER"]}]}]} */
   data: {
     /** Cursor string that can be passed to the `cursor` query parameter to get the next page. If this is `null`, then there are no more pages. */
     next: string | null;
@@ -3058,6 +3600,8 @@ export interface GetAtsJobsSuccessfulResponse {
       remote_id: string;
       /** Title of the job. */
       name: string | null;
+      /** The human readable job code. Some systems expose this as the Requisition Code/ID. */
+      job_code: string | null;
       /** Description of the job. This field is usually returned as HTML. */
       description: string | null;
       /** **(⚠️ Deprecated)** It makes more sense to store the visibility of a job in an enum. Therefore, we introduced the `visibility` enum on jobs. */
@@ -3091,6 +3635,8 @@ export interface GetAtsJobsSuccessfulResponse {
       /** The public job posting URL of the ATS itself. This can be used by external job boards to redirect applicants. */
       post_url: string | null;
       experience_level: string | null;
+      /** Defines if the job supports remote work and if so, to what extent. */
+      remote_work_status: "REMOTE" | "HYBRID" | "TEMPORARY" | "ON_SITE" | string | null;
       /**
        * The salary amount in the given currency.
        * @format double
@@ -3131,11 +3677,17 @@ export interface GetAtsJobsSuccessfulResponse {
          * @default null
          */
         country?: string | null;
-        /** @default null */
+        /**
+         * If we have address data, this is filled with the raw address string.
+         * @default null
+         */
         raw?: string | null;
         /** @default null */
         state?: string | null;
-        /** @default null */
+        /**
+         * If we can parse the address data, this field contains the first part of the street information.
+         * @default null
+         */
         street_1?: string | null;
         /** @default null */
         street_2?: string | null;
@@ -3176,12 +3728,14 @@ export interface GetAtsJobsSuccessfulResponse {
        */
       remote_deleted_at: string | null;
     } & {
+      /** Application stages a candidate can be in for this particular job.  */
       stages: ({
         id: string;
         remote_id: string | null;
         name: string | null;
       } & {
         /**
+         * Numeric index following the order of the stages if they are ordered in the underlying tool.
          * @format int64
          * @min -9007199254740991
          * @exclusiveMin false
@@ -3244,15 +3798,15 @@ export interface GetAtsJobsSuccessfulResponse {
               /** @default null */
               display_type?: "DROPDOWN" | "RADIO" | null;
               options: {
-                /** Content of the question option. */
-                name: string;
+                /** Kombo ID of this question option. Use this ID to specify the answer to this question. */
+                id: string;
                 /**
                  * ID in the connected ATS. This might be null as some systems only use the name to identify the option.
                  * @default null
                  */
                 remote_id?: string | null;
-                /** Kombo ID of this question option. Use this ID to specify the answer to this question. */
-                id: string;
+                /** Content of the question option. */
+                name: string;
               }[];
               type: "SINGLE_SELECT";
             }
@@ -3264,15 +3818,15 @@ export interface GetAtsJobsSuccessfulResponse {
             }
           | {
               options: {
-                /** Content of the question option. */
-                name: string;
+                /** Kombo ID of this question option. Use this ID to specify the answer to this question. */
+                id: string;
                 /**
                  * ID in the connected ATS. This might be null as some systems only use the name to identify the option.
                  * @default null
                  */
                 remote_id?: string | null;
-                /** Kombo ID of this question option. Use this ID to specify the answer to this question. */
-                id: string;
+                /** Content of the question option. */
+                name: string;
               }[];
               type: "MULTI_SELECT";
             }
@@ -3301,6 +3855,13 @@ export interface GetAtsJobsSuccessfulResponse {
         index: number | null;
         required: boolean | null;
       })[];
+      job_postings: {
+        id: string;
+        remote_id: string | null;
+        description_html: string | null;
+        status: "ACTIVE" | "INACTIVE" | "DRAFT" | null;
+        visibility: "PUBLIC" | "INTERNAL" | "UNLISTED" | null;
+      }[];
       hiring_team: ({
         id: string;
         remote_id: string | null;
@@ -3309,7 +3870,7 @@ export interface GetAtsJobsSuccessfulResponse {
         /** Last name of the user. */
         last_name: string | null;
         /**
-         * Email of the user.
+         * Email of the user. If the email address is invalid, it will be set to null.
          * @format email
          */
         email: string | null;
@@ -3322,20 +3883,6 @@ export interface GetAtsJobsSuccessfulResponse {
 }
 
 export interface GetAtsJobsErrorResponse {
-  status: "error";
-  error: {
-    message: string;
-  };
-}
-
-export type GetAtsJobsJobIdPostingsParameterJobId = string;
-
-export interface GetAtsJobsJobIdPostingsSuccessfulResponse {
-  status: "success";
-  data: object;
-}
-
-export interface GetAtsJobsJobIdPostingsErrorResponse {
   status: "error";
   error: {
     message: string;
@@ -3355,6 +3902,8 @@ export interface PostAtsJobsJobIdApplicationsSuccessfulResponse {
      * Kombo will always try to deliver this infomation as reliably as possible.
      */
     outcome: "PENDING" | "HIRED" | "DECLINED" | null;
+    /** Reason for the rejection of the candidate. */
+    rejection_reason_name: string | null;
     /** ID of the current application stage */
     current_stage_id: string | null;
     job_id: string | null;
@@ -3369,6 +3918,16 @@ export interface PostAtsJobsJobIdApplicationsSuccessfulResponse {
      * @format date-time
      */
     remote_deleted_at: string | null;
+    /**
+     * YYYY-MM-DDTHH:mm:ss.sssZ
+     * @format date-time
+     */
+    remote_created_at: string | null;
+    /**
+     * YYYY-MM-DDTHH:mm:ss.sssZ
+     * @format date-time
+     */
+    remote_updated_at: string | null;
     remote_data: Record<string, any>;
   } & {
     /** @example {"id":"26vafvWSRmbhNcxJYqjCzuJg","name":"Initial Screening","remote_id":"32"} */
@@ -3443,11 +4002,17 @@ export interface PostAtsJobsJobIdApplicationsSuccessfulResponse {
          * @default null
          */
         country?: string | null;
-        /** @default null */
+        /**
+         * If we have address data, this is filled with the raw address string.
+         * @default null
+         */
         raw?: string | null;
         /** @default null */
         state?: string | null;
-        /** @default null */
+        /**
+         * If we can parse the address data, this field contains the first part of the street information.
+         * @default null
+         */
         street_1?: string | null;
         /** @default null */
         street_2?: string | null;
@@ -3496,7 +4061,7 @@ export interface PostAtsJobsJobIdApplicationsErrorResponse {
 }
 
 export type PostAtsJobsJobIdApplicationsRequestBody = {
-  /** Stage this candidate should be in. If left out, the default stage for this job will be used. */
+  /** Stage this candidate should be in. If left out, the default stage for this job will be used. You can obtain the possible `stage_id`s from the `get-jobs` endpoint. */
   stage_id?: string;
   candidate: {
     first_name: string;
@@ -3541,15 +4106,22 @@ export type PostAtsJobsJobIdApplicationsRequestBody = {
        */
       amount: number;
     };
+    /**
+     * A list of social media links of the applicant. The links must be valid URLs.
+     * @default []
+     */
+    social_links?: {
+      /** @format url */
+      url: string;
+    }[];
   };
   /**
    * Array of the attachments you would like upload.
    * @default []
    */
-  attachments?: {
+  attachments?: ({
     /** Name of the file you want to upload. */
     name: string;
-    type: "CV" | "COVER_LETTER" | "OTHER";
     /**
      * Content/MIME type of the file (e.g., `application/pdf`). This is required if you provide `data` and optional if you provide `data_url`.
      * @pattern /^[\w.-]+\/[\w.-]+$/
@@ -3562,8 +4134,16 @@ export type PostAtsJobsJobIdApplicationsRequestBody = {
      * @format url
      */
     data_url?: string;
-  }[];
-  /** Optional source information that will be attached to the candidate. If you're a job board or recruiting service, you can use this to make sure your customers can see which candidates came from you. */
+  } & {
+    type: "CV" | "COVER_LETTER" | "OTHER";
+  })[];
+  /**
+   * **(⚠️ Deprecated - Use [automatic source writing](/ats/features/application-attribution#automatic-attribution) instead)** Optional source information that will be attached to the candidate. If
+   * you're a job board or recruiting service, you can use this to make sure your
+   * customers can see which candidates came from you.
+   *
+   * This is deprecated because writing sources requires users to do some setup in most ATSs.
+   */
   source?: {
     /**
      * Name of the source (e.g., `"Example Job Board"`).
@@ -3592,6 +4172,25 @@ export type PostAtsJobsJobIdApplicationsRequestBody = {
       /** Fields that we will pass through to SuccessFactor's `JobApplication` object. */
       JobApplication?: Record<string, any>;
     };
+    teamtailor?: {
+      /** Fields that we will pass through to Teamtailor's `Candidate` object. */
+      candidate?: Record<string, any>;
+    };
+    /** Fields specific to Greenhouse. */
+    greenhouse?: {
+      /** Fields that we will pass through to Greenhouse's `Candidate` object. */
+      candidate?: Record<string, any>;
+    };
+    /** Fields specific to Lever. */
+    lever?: {
+      /** Fields that we will pass through to Lever's `Candidate` object. Note: make sure to submit the keys and values in the correct form data format. */
+      candidate?: Record<string, any>;
+    };
+    /** Fields specific to Workable. */
+    workable?: {
+      /** Fields that we will pass through to Workable's `Candidate` object. */
+      candidate?: Record<string, any>;
+    };
   } & {
     /** Fields specific to Greenhouse. */
     greenhouse?: {
@@ -3612,10 +4211,46 @@ export type PostAtsJobsJobIdApplicationsRequestBody = {
    * @example [{"question_id":"D8yPrjXXvA2XeBksTmrVvKSn","answer":"Yes"}]
    */
   screening_question_answers?: {
-    /** ID of the question returned by the Kombo API. Will throw an error if the question is not connected to the job. */
+    /** ID of the question returned by the Kombo API. We'll report a warning in the logs if the question can't be found on the job. */
     question_id: string;
-    /** Answer to a question. This will be validated based on the question format and throw an error if the answer is invalid. */
-    answer: string | boolean | number | string[];
+    /**
+     * Answer to a question. This will be validated based on the question format and throw an error if the answer is invalid. Here is a description of each question type and the required answer format:
+     *
+     * `TEXT` - Simply provide a "string" answer.
+     *
+     * `SINGLE_SELECT` - Provide the ID of the answer as a string.
+     *
+     * `MULTI_SELECT` - Provide a string array containing the question IDs of the selected options.
+     *
+     * `BOOLEAN` - Either `true` or `false`.
+     *
+     * `NUMBER` - A number.
+     *
+     * `DATE` - Provide the answer as an ISO 8601 date string.
+     *
+     * `FILE` - Please select Option 6 in the dropdown above to see the required format.
+     */
+    answer:
+      | string
+      | boolean
+      | number
+      | string[]
+      | {
+          /** Name of the file you want to upload. */
+          name: string;
+          /**
+           * Content/MIME type of the file (e.g., `application/pdf`). This is required if you provide `data` and optional if you provide `data_url`.
+           * @pattern /^[\w.-]+\/[\w.-]+$/
+           */
+          content_type?: string;
+          /** Base64-encoded contents of the file you want to upload. You must provide either this or `data_url`. */
+          data?: string;
+          /**
+           * Publicly accessible URL to the file you want to upload. You must provide either this or `data`.
+           * @format url
+           */
+          data_url?: string;
+        };
   }[];
 };
 
@@ -3634,7 +4269,7 @@ export type GetAtsUsersParameterCursor = string;
 export type GetAtsUsersParameterPageSize = number;
 
 /**
- * Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
+ * Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden.
  * @format date-time
  * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
  */
@@ -3649,10 +4284,7 @@ export enum GetAtsUsersParameterIncludeDeleted {
   False = "false",
 }
 
-/**
- * Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`.
- * @pattern /^([\da-z]{24}(,[\da-z]{24})*)?$/i
- */
+/** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
 export type GetAtsUsersParameterIds = string;
 
 /** Filter by a comma-separated list of remote IDs. */
@@ -3672,7 +4304,7 @@ export interface GetAtsUsersSuccessfulResponse {
       /** Last name of the user. */
       last_name: string | null;
       /**
-       * Email of the user.
+       * Email of the user. If the email address is invalid, it will be set to null.
        * @format email
        */
       email: string | null;
@@ -3697,6 +4329,142 @@ export interface GetAtsUsersErrorResponse {
     message: string;
   };
 }
+
+export interface GetAssessmentPackagesSuccessfulResponse {
+  status: "success";
+  /** @example {"packages":[{"id":"1001","name":"TypeScript","description":"TypeScript coding skills assessments","updated_at":"2023-06-29T18:47:40.890Z","type":"SKILLS_TEST"}]} */
+  data: {
+    packages: {
+      id: string;
+      name: string;
+      description: string;
+      /**
+       * YYYY-MM-DDTHH:mm:ss.sssZ
+       * @format date-time
+       */
+      updated_at: string | null;
+      type: "BEHAVIORAL" | "VIDEO_INTERVIEW" | "SKILLS_TEST" | "BACKGROUND_CHECK" | "REFERENCE_CHECK" | null;
+    }[];
+  };
+}
+
+export interface GetAssessmentPackagesErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export interface PutAssessmentPackagesSuccessfulResponse {
+  status: "success";
+  data: object;
+}
+
+export interface PutAssessmentPackagesErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PutAssessmentPackagesRequestBody = {
+  packages: {
+    /** A unique identifier for the assessment package. */
+    id: string;
+    type: "BEHAVIORAL" | "VIDEO_INTERVIEW" | "SKILLS_TEST" | "BACKGROUND_CHECK" | "REFERENCE_CHECK";
+    /** The name of the assessment package. */
+    name: string;
+    /** Description about the package. Some ATSs will display this in their UI. */
+    description: string;
+  }[];
+};
+
+/** An optional cursor string used for pagination. This can be retrieved from the `next` property of the previous page response. */
+export type GetAssessmentOrdersOpenParameterCursor = string;
+
+/**
+ * The number of results to return per page.
+ * @format int64
+ * @min 1
+ * @exclusiveMin false
+ * @max 250
+ * @exclusiveMax false
+ * @default 100
+ */
+export type GetAssessmentOrdersOpenParameterPageSize = number;
+
+export interface GetAssessmentOrdersOpenSuccessfulResponse {
+  status: "success";
+  data: {
+    next: string | null;
+    results: {
+      id: string;
+      package_id: string;
+      candidate: {
+        email: string;
+        first_name?: string | null;
+        last_name?: string | null;
+        phone?: string | null;
+        remote_id?: string | null;
+      };
+    }[];
+  };
+}
+
+export interface GetAssessmentOrdersOpenErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PutAssessmentOrdersAssessmentOrderIdResultParameterAssessmentOrderId = string;
+
+export interface PutAssessmentOrdersAssessmentOrderIdResultSuccessfulResponse {
+  status: "success";
+  data: object;
+}
+
+export interface PutAssessmentOrdersAssessmentOrderIdResultErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PutAssessmentOrdersAssessmentOrderIdResultRequestBody = {
+  /** Status of the assessment. Must be one of `COMPLETE` or `CANCELLED`. */
+  status: "COMPLETED" | "CANCELLED" | "OPEN";
+  /** @format url */
+  result_url: string;
+  /**
+   * YYYY-MM-DDTHH:mm:ss.sssZ
+   * @format date-time
+   * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
+   */
+  completed_at: string;
+  /**
+   * @format double
+   * @min 5e-324
+   * @exclusiveMin false
+   * @max 1.7976931348623157e+308
+   * @exclusiveMax false
+   */
+  score?: number;
+  /**
+   * @format double
+   * @min 5e-324
+   * @exclusiveMin false
+   * @max 1.7976931348623157e+308
+   * @exclusiveMax false
+   */
+  max_score?: number;
+  /** @default [] */
+  attributes?: {
+    field: string;
+    value: string;
+  }[];
+};
 
 export interface PostConnectCreateLinkSuccessfulResponse {
   status: "success";
@@ -3740,7 +4508,7 @@ export type PostConnectCreateLinkRequestBody = {
    * Category of the integration you want your customer to create.
    * @default "HRIS"
    */
-  integration_category?: "HRIS" | "ATS";
+  integration_category?: "HRIS" | "ATS" | "ASSESSMENT";
   /**
    * Pre-define a tool this integration link can be used for.
    * @default null
@@ -3751,6 +4519,7 @@ export type PostConnectCreateLinkRequestBody = {
     | "successfactors"
     | "smartrecruiters"
     | "factorial"
+    | "oraclerecruiting"
     | "lever"
     | "recruitee"
     | "greenhouse"
@@ -3775,6 +4544,7 @@ export type PostConnectCreateLinkRequestBody = {
     | "dvinci"
     | "join"
     | "deel"
+    | "remotecom"
     | "jobvite"
     | "okta"
     | "sagehr"
@@ -3783,12 +4553,15 @@ export type PostConnectCreateLinkRequestBody = {
     | "erecruiter"
     | "eurecia"
     | "umantis"
+    | "oraclehcm"
     | "taleez"
     | "officient"
     | "sesamehr"
     | "charliehr"
     | "hrworks"
     | "otys"
+    | "gusto"
+    | "breathehr"
     | "rippling"
     | "nmbrs"
     | "heyrecruit"
@@ -3797,14 +4570,19 @@ export type PostConnectCreateLinkRequestBody = {
     | "jazzhr"
     | "lucca"
     | "bite"
+    | "homerun"
     | "haileyhr"
     | "silae"
+    | "mysolution"
     | "datev"
+    | "datevlug"
     | "sympa"
     | "breezyhr"
     | "flatchr"
     | "applicantstack"
-    | "oraclehcm"
+    | "concludis"
+    | "iriscascade"
+    | "sandbox"
     | null;
   /**
    * Language of the connection flow UI.
@@ -3840,6 +4618,32 @@ export interface PostConnectActivateIntegrationErrorResponse {
 
 export type PostConnectActivateIntegrationRequestBody = {
   token: string;
+};
+
+export interface PostCustomDatevPassthroughSuccessfulResponse {
+  status: "success";
+  data: object;
+}
+
+export interface PostCustomDatevPassthroughErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PostCustomDatevPassthroughRequestBody = {
+  /** @minLength 1 */
+  file_content: string;
+  /**
+   * YYYY-MM-DDTHH:mm:ss.sssZ
+   * @format date-time
+   * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
+   */
+  accounting_month: string;
+  target_system: "LODAS";
+  file_type: "STAMMDATEN" | "BEWEGUNGSDATEN";
+  file_name: string;
 };
 
 /** ID of the employee that should be updated. You can use their Kombo `id` or their ID in the remote system by prefixing it with `remote:` (e.g., `remote:12312`) */
@@ -3945,6 +4749,15 @@ export type PutCustomDatevEmployeesEmployeeIdCompensationsRequestBody = {
     currency: "EUR";
     /** The period for which the specified amount is paid. Currently, integrated systems only support "HOUR" and "MONTH". */
     period: "HOUR" | "MONTH";
+    /**
+     * The Lohnart that should be used for this compensation. If not specified, the default Lohnart that was requested in the connection flow will be used. Generally Lohnart is only available for monthly compensations.
+     * @format int64
+     * @min 1
+     * @exclusiveMin false
+     * @max 9999
+     * @exclusiveMax false
+     */
+    lohnart?: number;
   }[];
 };
 
@@ -4023,6 +4836,43 @@ export type PostCustomDatevPushDataPayrollRequestBody = {
    * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
    */
   payroll_month: string;
+};
+
+/** ID of the employee that should be updated. You can use their Kombo `id` or their ID in the remote system by prefixing it with `remote:` (e.g., `remote:12312`) */
+export type PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsParameterEmployeeId = string;
+
+export interface PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsSuccessfulResponse {
+  status: "success";
+  data: object;
+}
+
+export interface PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsErrorResponse {
+  status: "error";
+  error: {
+    message: string;
+  };
+}
+
+export type PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsRequestBody = {
+  /** The ID code of the supplement that you want to add to Silae. */
+  supplement_code: string;
+  /**
+   * Date from which the submitted supplement should be active.
+   * @format date-time
+   * @pattern ^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?)?Z?$
+   */
+  effective_date: string;
+  /**
+   * The amount of the supplement if it requires a number.
+   * @format double
+   * @min 5e-324
+   * @exclusiveMin false
+   * @max 1.7976931348623157e+308
+   * @exclusiveMax false
+   */
+  element_amount?: number;
+  /** The string of the supplement if it requires a string. */
+  element_string?: string;
 };
 
 export type QueryParamsType = Record<string | number, any>;
@@ -4202,7 +5052,7 @@ export class HttpClient<SecurityDataType = unknown> {
         ...(requestParams.headers || {}),
         ...(type && type !== ContentType.FormData ? { "Content-Type": type } : {}),
       },
-      signal: cancelToken ? this.createAbortSignal(cancelToken) : requestParams.signal,
+      signal: (cancelToken ? this.createAbortSignal(cancelToken) : requestParams.signal) || null,
       body: typeof body === "undefined" || body === null ? null : payloadFormatter(body),
     }).then(async (response) => {
       const r = response as HttpResponse<T, E>;
@@ -4292,11 +5142,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
   };
   passthrough = {
     /**
-     * @description Send a request to the specified integration's native API. At Kombo we put a lot of work into making sure that our unified API covers all our customers' use cases and that they never have to think about integration-specific logic again. There are cases, however, where our customers want to build features that are very integration-specfic. That's where this endpoint comes in. Pass in details about the request you want to make to the integration's API and we'll forward it for you. We'll also take care of setting the right base URL and authenticating your requests. To get started, please pick the relevant API (some tools provide multiple to due different base URLs or authentication schemes) from the table below and pass in the `{tool}/{api}` identifier as part of the path. |Integration|`{tool}/{api}`|Description| |---|---|---| |Personio|`personio/personnel`|Personio's [Personnel Data API](https://developer.personio.de/reference/get_company-employees). We automatically authenticate all requests using the client ID and secret and use `https://api.personio.de/v1` as the base URL.| |Personio|`personio/recruiting`|Personio's [Recruiting API](https://developer.personio.de/reference/get_company-employees). We automatically authenticate all requests using the Recruiting access token and use `https://api.personio.de/v1/recruiting` as the base URL.| |Personio|`personio/jobboard`|API endpoints exposed on Personio's public job board pages ([currently just the XML feed](https://developer.personio.de/reference/get_xml)). We automatically use the right `https://{company}.jobs.personio.de` base URL.| |SAP SuccessFactors|`successfactors/odata-v2`|[SuccessFactors' OData V2 API](https://help.sap.com/doc/74597e67f54d4f448252bad4c2b601c9/2211/en-US/SF_HCM_OData_API_REF_en.pdf). We automatically authenticate all requests and use `https://{api_domain}/odata/v2` as the base URL.| |Recruitee|`recruitee/default`|The [Recruitee API](https://api.recruitee.com/docs/index.html). We automatically authenticate all requests and use `https://api.recruitee.com/c/{company_id}` as the base URL.| |HiBob|`hibob/v1`|[HibBob's v1 API](https://apidocs.hibob.com/reference/get_people). We automatically authenticate all requests using the service user credentials (or, for old integrations, the API key) and use `https://api.hibob.com/v1` as the base URL.| <Note>Please note that the pass-through API endpoints are only meant for edge cases. That's why we only expose them for new integrations after understanding a concrete customer use case. If you have such a use case in mind, please reach out to Kombo.</Note>
+     * @description Send a request to the specified integration's native API. At Kombo we put a lot of work into making sure that our unified API covers all our customers' use cases and that they never have to think about integration-specific logic again. There are cases, however, where our customers want to build features that are very integration-specific. That's where this endpoint comes in. Pass in details about the request you want to make to the integration's API and we'll forward it for you. We'll also take care of setting the right base URL and authenticating your requests. To get started, please pick the relevant API (some tools provide multiple to due different base URLs or authentication schemes) from the table below and pass in the `{tool}/{api}` identifier as part of the path. |Integration|`{tool}/{api}`|Description| |---|---|---| |Personio|`personio/personnel`|Personio's [Personnel Data API](https://developer.personio.de/reference/get_company-employees). We automatically authenticate all requests using the client ID and secret and use `https://api.personio.de/v1` as the base URL.| |Workday|`workday/soap`|[Workday's SOAP API](https://community.workday.com/sites/default/files/file-hosting/productionapi/index.html). We automatically authenticate all requests. Set `data` to your raw xml string. Use `/` as your `path`, as we will always send requests to `https://{domain}/ccx/service/{tenant}/{service_name}/38.2`. Set your `method` to `POST`. You need to specify the `api_options` object and set `service_name` to the name of the service you want to call. Find all available services [here](https://community.workday.com/sites/default/files/file-hosting/productionapi/versions/v41.0/index.html). The string that you submit as `data` will be the content of the `soapenv:Body` tag in the request.| |SAP SuccessFactors|`successfactors/odata-v2`|[SuccessFactors' OData V2 API](https://help.sap.com/doc/74597e67f54d4f448252bad4c2b601c9/2211/en-US/SF_HCM_OData_API_REF_en.pdf). We automatically authenticate all requests and use `https://{api_domain}/odata/v2` as the base URL.| |Recruitee|`recruitee/default`|The [Recruitee API](https://api.recruitee.com/docs/index.html). We automatically authenticate all requests and use `https://api.recruitee.com/c/{company_id}` as the base URL.| |Greenhouse|`greenhouse/harvest`|Greenhouse [Harvest API](https://developers.greenhouse.io/harvest.html). We automatically authenticate all requests using the API key and use `https://harvest.greenhouse.io/v1` as the base URL.| |Teamtailor|`teamtailor/v1`|Teamtailor's [JSON-API](https://docs.teamtailor.com/). We authenticate all request with the Teamtailor API key and use the base URL `https://api.teamtailor.com/v1`.| |Personio|`personio/recruiting`|Personio's [Recruiting API](https://developer.personio.de/reference/get_company-employees). We automatically authenticate all requests using the Recruiting access token and use `https://api.personio.de/v1/recruiting` as the base URL.| |Personio|`personio/jobboard`|API endpoints exposed on Personio's public job board pages ([currently just the XML feed](https://developer.personio.de/reference/get_xml)). We automatically use the right `https://{company}.jobs.personio.de` base URL.| |BambooHR|`bamboohr/v1`|BambooHR's [API](https://documentation.bamboohr.com/reference/get-employee). We automatically authenticate all requests using the customer credentials `https://api.bamboohr.com/api/gateway.php/{subdomain}/v1` as the base URL.| |Workable|`workable/v1`|Workable's [API](https://workable.readme.io/reference/generate-an-access-token). We automatically authenticate all requests using the client ID and secret and use `https://subdomain.workable.com/spi/v3` as the base URL.| |HiBob|`hibob/v1`|[HibBob's v1 API](https://apidocs.hibob.com/reference/get_people). We automatically authenticate all requests using the service user credentials (or, for old integrations, the API key) and use `https://api.hibob.com/v1` as the base URL.| |Pinpoint|`pinpoint/v1`|Pinpoint's [JSON:API](https://developers.pinpointhq.com/docs). We automatically authenticate all requests using the `X-API-KEY` header and use `https://{subdomain}.pinpointhq.com/api/v1` as the base URL.| |Haufe Umantis|`umantis/v1`|[Umantis API v1](https://recruitingapp-91005709.umantis.com/api/v1/swagger-ui). We automatically authenticate all requests and use `https://{subdomain}.umantis.com/api/v1` as the base URL.| <Note>Please note that the passthrough API endpoints are only meant for edge cases. That's why we only expose them for new integrations after understanding a concrete customer use case. If you have such a use case in mind, please reach out to Kombo.</Note>
      *
      * @tags General
      * @name PostPassthroughToolApi
-     * @summary Send pass-through request
+     * @summary Send passthrough request
      * @request POST:/passthrough/{tool}/{api}
      * @secure
      */
@@ -4443,7 +5293,67 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
   };
   hris = {
     /**
-     * @description Retrieve all employees. <Note>Not interested in most fields? You can use our [our Scopes feature](/scopes) to customize what data points will synced.</Note>
+     * @description Get the list of users to provision, deprovision, and optionally update based on the users you've already provisioned in your system.
+     *
+     * @tags Unified HRIS API
+     * @name PostHrisProvisioningGroupsGroupIdDiff
+     * @summary Get provisioning diff
+     * @request POST:/hris/provisioning-groups/{group_id}/diff
+     * @secure
+     */
+    postHrisProvisioningGroupsGroupIdDiff: (
+      groupId: PostHrisProvisioningGroupsGroupIdDiffParameterGroupId,
+      data: PostHrisProvisioningGroupsGroupIdDiffRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<
+        PostHrisProvisioningGroupsGroupIdDiffSuccessfulResponse,
+        PostHrisProvisioningGroupsGroupIdDiffErrorResponse
+      >({
+        path: `/hris/provisioning-groups/${groupId}/diff`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Create a new link that can be passed to the Kombo Connect SDK to open the provisioning setup UI.
+     *
+     * @tags Unified HRIS API
+     * @name PostHrisProvisioningGroupsGroupIdSetupLinks
+     * @summary Create provisioning setup link
+     * @request POST:/hris/provisioning-groups/{group_id}/setup-links
+     * @secure
+     */
+    postHrisProvisioningGroupsGroupIdSetupLinks: (
+      groupId: PostHrisProvisioningGroupsGroupIdSetupLinksParameterGroupId,
+      data: PostHrisProvisioningGroupsGroupIdSetupLinksRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<
+        PostHrisProvisioningGroupsGroupIdSetupLinksSuccessfulResponse,
+        | PostHrisProvisioningGroupsGroupIdSetupLinksErrorResponse
+        | {
+            status: "error";
+            error: {
+              message: string;
+            };
+          }
+      >({
+        path: `/hris/provisioning-groups/${groupId}/setup-links`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Retrieve all employees. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/kenjo/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Kenjo</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heavenhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HeavenHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/azuread/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Azure AD</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/googleworkspace/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Google Workspace</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/remotecom/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Remote</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/okta/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Okta</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/eurecia/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Eurécia</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclehcm/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle HCM</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/officient/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Officient</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/gusto/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Gusto</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breathehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breathe HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rippling/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Rippling</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/nmbrs/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Nmbrs</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/peoplehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PeopleHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lucca/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lucca</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/haileyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Hailey HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/iriscascade/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />IRIS Cascade</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note>Not interested in most fields? You can use our [our Scopes feature](/scopes) to customize what data points are synced.</Note> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisEmployees
@@ -4457,20 +5367,34 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisEmployeesParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisEmployeesParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisEmployeesParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisEmployeesParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisEmployeesParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisEmployeesParameterRemoteIds;
-        /** Filter by the `employment_status` field. */
+        /** **(⚠️ Deprecated - Use the `employment_statuses` filter instead.)** Filter by the `employment_status` field. */
         employment_status?: GetHrisEmployeesParameterEmploymentStatus;
-        /** Filter by a comma-separated list of group IDs. We will return all employees that are members of _any_ of the groups. */
+        /**
+         * Filter by a comma-separated list of `ACTIVE`, `PENDING`, `INACTIVE`, `LEAVE`
+         * * `ACTIVE`: the employee is **actively employed**
+         * * `PENDING`: the employee is **not actively employed yet** (but they signed their contract or are part of an onboarding process)
+         * * `INACTIVE`: a full-time employee is no longer employed, or, for a contract worker when their contract runs out
+         * * `LEAVE`: the employee is still employed but **currently on leave** (note that not all HR systems support this status — use our absences API for detailed information)
+         */
+        employment_statuses?: GetHrisEmployeesParameterEmploymentStatuses;
+        /** Filter by a comma-separated list of group IDs. We will only return employees that are members of _any_ of the groups. */
         group_ids?: GetHrisEmployeesParameterGroupIds;
-        /** Filter by a comma-separated list of legal entity IDs. We will return all employees that are members of _any_ of the legal entities. */
+        /** Filter by a comma-separated list of legal entity IDs. We will only return employees that are members of _any_ of the legal entities. */
         legal_entity_ids?: GetHrisEmployeesParameterLegalEntityIds;
+        /** Filter by a comma-separated list of work location IDs. We will only return employees who are at _any_ of the work locations. */
+        work_location_ids?: GetHrisEmployeesParameterWorkLocationIds;
+        /** Filter by a comma-separated list of work emails. We will only return employees who have _any_ of the work emails. */
+        work_emails?: GetHrisEmployeesParameterWorkEmails;
+        /** Filter by a comma-separated list of personal emails. We will only return employees who have _any_ of the personal emails. */
+        personal_emails?: GetHrisEmployeesParameterPersonalEmails;
       },
       params: RequestParams = {},
     ) =>
@@ -4493,7 +5417,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Create a new employee. <Note> This endpoint requires the permission **Create and manage employees** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "first_name": "John", "last_name": "Doe", "work_email": "john.doe@acme.com", "gender": "MALE", "job_title": "Integrations Team Lead", "home_address": { "city": "Berlin", "country": "DE", "state": "Berlin", "street_1": "Sonnenallee 63", "zip_code": "12045" }, "date_of_birth": "1986-01-01", "start_date": "2020-04-07" } ```
+     * @description Create a new employee. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/remotecom/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Remote</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breathehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breathe HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/nmbrs/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Nmbrs</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Create and manage employees** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "first_name": "John", "last_name": "Doe", "work_email": "john.doe@acme.com", "gender": "MALE", "job_title": "Integrations Team Lead", "home_address": { "city": "Berlin", "country": "DE", "state": "Berlin", "street_1": "Sonnenallee 63", "zip_code": "12045" }, "date_of_birth": "1986-01-01", "start_date": "2020-04-07" } ```
      *
      * @tags Unified HRIS API
      * @name PostHrisEmployees
@@ -4522,7 +5446,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Update an employee. <Note> This endpoint requires the permission **Create and manage employees** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "BkgfzSr5muN9cUTMD4wDQFn4", "first_name": "John", "last_name": "Doe", "work_email": "john.doe@acme.com", "ssn": "555-32-6395", "tax_id": "12 345 678 901", "gender": "MALE", "marital_status": "MARRIED", "date_of_birth": "1986-01-01", "start_date": "2020-04-07", "termination_date": "2022-05-20", "job_title": "Integrations Team Lead", "home_address": { "city": "Berlin", "country": "DE", "state": "Berlin", "street_1": "Sonnenallee 63", "zip_code": "12045" } } ```
+     * @description Update an employee. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datev/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV LODAS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datevlug/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV Lohn & Gehalt</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Create and manage employees** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "BkgfzSr5muN9cUTMD4wDQFn4", "first_name": "John", "last_name": "Doe", "work_email": "john.doe@acme.com", "ssn": "555-32-6395", "tax_id": "12 345 678 901", "gender": "MALE", "marital_status": "MARRIED", "date_of_birth": "1986-01-01", "start_date": "2020-04-07", "termination_date": "2022-05-20", "job_title": "Integrations Team Lead", "nationality": "DE", "home_address": { "city": "Berlin", "country": "DE", "state": "Berlin", "street_1": "Sonnenallee 63", "zip_code": "12045" } } ```
      *
      * @tags Unified HRIS API
      * @name PatchHrisEmployeesEmployeeId
@@ -4582,7 +5506,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Get the teams. **(⚠️ Deprecated)** Please use [the `/groups` endpoint](/hris/v1/get-groups) instead. It returns the same data but the naming makes more sense as the model not only includes teams but also departments and cost centers.
+     * @description Get the teams. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/kenjo/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Kenjo</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heavenhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HeavenHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/azuread/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Azure AD</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/googleworkspace/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Google Workspace</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/okta/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Okta</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/eurecia/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Eurécia</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclehcm/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle HCM</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/officient/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Officient</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/gusto/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Gusto</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breathehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breathe HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rippling/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Rippling</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/nmbrs/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Nmbrs</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/peoplehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PeopleHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lucca/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lucca</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/haileyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Hailey HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/iriscascade/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />IRIS Cascade</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Warning> **This endpoint is deprecated!** Please use [the `/groups` endpoint](/hris/v1/get-groups) instead. It returns the same data but the naming makes more sense as the model not only includes teams but also departments and cost centers.. </Warning> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisTeams
@@ -4596,11 +5520,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisTeamsParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisTeamsParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisTeamsParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisTeamsParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisTeamsParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisTeamsParameterRemoteIds;
@@ -4626,7 +5550,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all "groups" (teams, departments, and cost centers).
+     * @description Retrieve all "groups" (teams, departments, and cost centers). <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/kenjo/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Kenjo</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heavenhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HeavenHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/azuread/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Azure AD</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/googleworkspace/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Google Workspace</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/okta/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Okta</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/eurecia/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Eurécia</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclehcm/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle HCM</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/officient/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Officient</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/gusto/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Gusto</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breathehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breathe HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rippling/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Rippling</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/nmbrs/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Nmbrs</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/peoplehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PeopleHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lucca/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lucca</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/haileyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Hailey HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/iriscascade/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />IRIS Cascade</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisGroups
@@ -4640,11 +5564,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisGroupsParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisGroupsParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisGroupsParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisGroupsParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisGroupsParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisGroupsParameterRemoteIds;
@@ -4670,7 +5594,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all employments.
+     * @description Retrieve all employments. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/kenjo/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Kenjo</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heavenhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HeavenHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/remotecom/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Remote</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/eurecia/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Eurécia</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclehcm/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle HCM</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/officient/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Officient</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breathehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breathe HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/nmbrs/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Nmbrs</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/peoplehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PeopleHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lucca/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lucca</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/haileyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Hailey HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/iriscascade/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />IRIS Cascade</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisEmployments
@@ -4684,11 +5608,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisEmploymentsParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisEmploymentsParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisEmploymentsParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisEmploymentsParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisEmploymentsParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisEmploymentsParameterRemoteIds;
@@ -4714,7 +5638,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all locations.
+     * @description Retrieve all locations. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/kenjo/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Kenjo</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heavenhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HeavenHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/azuread/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Azure AD</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/remotecom/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Remote</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclehcm/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle HCM</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/gusto/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Gusto</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breathehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breathe HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rippling/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Rippling</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/nmbrs/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Nmbrs</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/peoplehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PeopleHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/haileyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Hailey HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisLocations
@@ -4728,11 +5652,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisLocationsParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisLocationsParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisLocationsParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisLocationsParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisLocationsParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisLocationsParameterRemoteIds;
@@ -4758,7 +5682,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all absence types.
+     * @description Retrieve all absence types. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/kenjo/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Kenjo</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/eurecia/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Eurécia</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/officient/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Officient</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rippling/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Rippling</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/peoplehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PeopleHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datev/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV LODAS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datevlug/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV Lohn & Gehalt</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisAbsenceTypes
@@ -4772,11 +5696,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisAbsenceTypesParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisAbsenceTypesParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisAbsenceTypesParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisAbsenceTypesParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisAbsenceTypesParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisAbsenceTypesParameterRemoteIds;
@@ -4802,7 +5726,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all time off balances.
+     * @description Retrieve all time off balances. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/eurecia/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Eurécia</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisTimeOffBalances
@@ -4816,11 +5740,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisTimeOffBalancesParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisTimeOffBalancesParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisTimeOffBalancesParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisTimeOffBalancesParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisTimeOffBalancesParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisTimeOffBalancesParameterRemoteIds;
@@ -4848,7 +5772,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all absences.
+     * @description Retrieve all absences. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/kenjo/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Kenjo</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/humaans/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Humaans</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/eurecia/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Eurécia</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/officient/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Officient</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/charliehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Charlie</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rippling/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Rippling</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/peoplehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PeopleHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/haileyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Hailey HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisAbsences
@@ -4862,23 +5786,25 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisAbsencesParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisAbsencesParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisAbsencesParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisAbsencesParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisAbsencesParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisAbsencesParameterRemoteIds;
-        /** Filter for all the absences that either start _or_ haven't ended yet on/after this day. If you imagine a calendar displaying absences, this defines the left-most visible day. */
+        /** Filter for all the absences that either start _or_ haven't ended yet on/after this day. If you imagine a calendar displaying absences, this defines the left-most visible day. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded. */
         date_from?: GetHrisAbsencesParameterDateFrom;
-        /** Filter for absences that start on or before this day (but might continue after). If you imagine a calendar displaying absences, this defines the right-most visible day. */
+        /** Filter for absences that start on or before this day (but might continue after). If you imagine a calendar displaying absences, this defines the right-most visible day. This is a plain date (i.e., `yyyy-MM-dd`), all time information is discarded. */
         date_until?: GetHrisAbsencesParameterDateUntil;
+        /** Filter by a comma-separated list of absence type IDs. */
+        type_ids?: GetHrisAbsencesParameterTypeIds;
         /** Filter by a specific employee using their ID. */
         employee_id?: GetHrisAbsencesParameterEmployeeId;
-        /** **(⚠️ Deprecated)** Filter for absences that either start after or start before and end after a certain time. Please use `date_from` instead. */
+        /** **(⚠️ Deprecated - Use the `date_from` filter instead.)** Filter for absences that either start after or start before and end after a certain time. */
         time_from?: GetHrisAbsencesParameterTimeFrom;
-        /** **(⚠️ Deprecated)** Filter for absences that start before a certain time. Please use `date_until` instead. */
+        /** **(⚠️ Deprecated - Use the `date_until` filter instead.)** Filter for absences that start before a certain time. */
         time_until?: GetHrisAbsencesParameterTimeUntil;
       },
       params: RequestParams = {},
@@ -4902,7 +5828,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Create a new absence. Check [this page](/hris/features/creating-absences) for a detailed guide. <Note> This endpoint requires the permission **Manage absences** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "wXJMxwDvPAjrJ4CyqdV9", "absence_type_id": "3YKtQ7qedsrcCady1jSyAkY1", "start_date": "2019-09-17", "end_date": "2019-09-21", "start_half_day": false, "end_half_day": false, "employee_note": "Visiting the aliens", "start_time": "08:30:00", "end_time": "16:00:00" } ```
+     * @description Create a new absence. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datev/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV LODAS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datevlug/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV Lohn & Gehalt</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Check [this page](/hris/features/creating-absences) for a detailed guide. <Note> This endpoint requires the permission **Manage absences** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "wXJMxwDvPAjrJ4CyqdV9", "absence_type_id": "3YKtQ7qedsrcCady1jSyAkY1", "start_date": "2019-09-17", "end_date": "2019-09-21", "start_half_day": false, "end_half_day": false, "employee_note": "Visiting the aliens", "start_time": "08:30:00", "end_time": "16:00:00" } ```
      *
      * @tags Unified HRIS API
      * @name PostHrisAbsences
@@ -4931,7 +5857,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Delete this absence. <Note> This endpoint requires the permission **Manage absences** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "absence_id": "wXJMxwDvPAjrJ4CyqdV9" } ```
+     * @description Delete this absence. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hibob/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HiBob</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sesamehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sesame HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Manage absences** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "absence_id": "wXJMxwDvPAjrJ4CyqdV9" } ```
      *
      * @tags Unified HRIS API
      * @name DeleteHrisAbsencesAbsenceId
@@ -4964,7 +5890,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all legal entites.
+     * @description Retrieve all legal entites. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/factorial/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Factorial</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/payfit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />PayFit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/deel/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Deel</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/gusto/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Gusto</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/nmbrs/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Nmbrs</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lucca/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lucca</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified HRIS API
      * @name GetHrisLegalEntities
@@ -4978,11 +5904,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetHrisLegalEntitiesParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetHrisLegalEntitiesParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetHrisLegalEntitiesParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetHrisLegalEntitiesParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetHrisLegalEntitiesParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetHrisLegalEntitiesParameterRemoteIds;
@@ -5009,7 +5935,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
   };
   ats = {
     /**
-     * @description Retrieve all applications.
+     * @description Retrieve all applications. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclerecruiting/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle Recruiting Cloud</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/fountain/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Fountain</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/softgarden/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Softgarden</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/dvinci/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />d.vinci</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jobvite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Jobvite</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/umantis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Haufe Umantis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/taleez/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Taleez</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BITE</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/flatchr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Flatchr</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/applicantstack/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />ApplicantStack</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified ATS API
      * @name GetAtsApplications
@@ -5023,14 +5949,20 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetAtsApplicationsParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetAtsApplicationsParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetAtsApplicationsParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetAtsApplicationsParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetAtsApplicationsParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetAtsApplicationsParameterRemoteIds;
+        /** **(⚠️ Deprecated - Use the `outcomes` filter instead.)** Filter applications by outcome. This allows you to get applications that are for example `PENDING`, `HIRED`, or `DECLINED`. */
+        outcome?: GetAtsApplicationsParameterOutcome;
+        /** Filter by a comma-separated list of `PENDING`, `HIRED`, `DECLINED`  */
+        outcomes?: GetAtsApplicationsParameterOutcomes;
+        /** Filter applications by the day they were created in the remote system. This allows you to get applications that were created on or after a certain day. */
+        remote_created_after?: GetAtsApplicationsParameterRemoteCreatedAfter;
       },
       params: RequestParams = {},
     ) =>
@@ -5053,7 +5985,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Moves an application to a specified stage. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "stage_id": "3PJ8PZhZZa1eEdd2DtPNtVup" } ```
+     * @description Moves an application to a specified stage. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclerecruiting/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle Recruiting Cloud</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "stage_id": "3PJ8PZhZZa1eEdd2DtPNtVup" } ```
      *
      * @tags Unified ATS API
      * @name PutAtsApplicationsApplicationIdStage
@@ -5119,7 +6051,40 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all candidates.
+     * @description Add a note to an application. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Add extra information to an application. This can be any extra text information you want to add to an application. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "content": "A new message from the candidate is available in YourChat!", "content_type": "PLAIN_TEXT" } ```
+     *
+     * @tags Unified ATS API
+     * @name PostAtsApplicationsApplicationIdNotes
+     * @summary Add note to application
+     * @request POST:/ats/applications/{application_id}/notes
+     * @secure
+     */
+    postAtsApplicationsApplicationIdNotes: (
+      applicationId: PostAtsApplicationsApplicationIdNotesParameterApplicationId,
+      data: PostAtsApplicationsApplicationIdNotesRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<
+        PostAtsApplicationsApplicationIdNotesSuccessfulResponse,
+        | PostAtsApplicationsApplicationIdNotesErrorResponse
+        | {
+            status: "error";
+            error: {
+              message: string;
+            };
+          }
+      >({
+        path: `/ats/applications/${applicationId}/notes`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Retrieve all candidates. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclerecruiting/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle Recruiting Cloud</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/fountain/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Fountain</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jobvite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Jobvite</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/umantis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Haufe Umantis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/taleez/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Taleez</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BITE</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/flatchr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Flatchr</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/applicantstack/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />ApplicantStack</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified ATS API
      * @name GetAtsCandidates
@@ -5133,14 +6098,16 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetAtsCandidatesParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetAtsCandidatesParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetAtsCandidatesParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetAtsCandidatesParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetAtsCandidatesParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetAtsCandidatesParameterRemoteIds;
+        /** Filter the candidates based on an email address. When set, returns only the candidates where the given `email` is in `email_addresses`.  */
+        email?: GetAtsCandidatesParameterEmail;
       },
       params: RequestParams = {},
     ) =>
@@ -5163,7 +6130,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description > We recommend the endpoint **Create Application** as it returns the application as the root object. That makes it easier to understand which application was created. Create a new candidate and application for the specified job. The first CV in the attachments will be treated as the resume of the candidate when the tool allows previewing a resume. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "candidate": { "first_name": "Frank", "last_name": "Doe", "company": "Acme Inc.", "title": "Head of Integrations", "email_address": "frank.doe@example.com", "phone_number": "+1-541-754-3010", "gender": "MALE", "salary_expectations": { "amount": 100000, "period": "YEAR" }, "availability_date": "2021-01-01", "location": { "city": "New York", "country": "US" } }, "application": { "job_id": "BDpgnpZ148nrGh4mYHNxJBgx", "stage_id": "8x3YKRDcuRnwShdh96ShBNn1" }, "screening_question_answers": [ { "question_id": "3phFBNXRweGnDmsU9o2vdPuQ", "answer": "Yes" }, { "question_id": "EYJjhMQT3LtVKXnTbnRT8s6U", "answer": [ "GUzE666zfyjeoCJX6A8n7wh6", "5WPHzzKAv8cx97KtHRUV96U8", "7yZfKGzWigXxxRTygqAfHvyE" ] } ], "attachments": [ { "name": "Frank Doe CV.txt", "data": "SGkgdGhlcmUsIEtvbWJvIGlzIGN1cnJlbnRseSBoaXJpbmcgZW5naW5lZXJzIHRoYXQgbG92ZSB0byB3b3JrIG9uIGRldmVsb3BlciBwcm9kdWN0cy4=", "type": "CV", "content_type": "text/plain" } ] } ```
+     * @description Create a new candidate and application for the specified job. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclerecruiting/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle Recruiting Cloud</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/fountain/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Fountain</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/softgarden/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Softgarden</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/dvinci/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />d.vinci</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/umantis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Haufe Umantis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/taleez/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Taleez</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heyrecruit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Heyrecruit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BITE</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/mysolution/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Mysolution</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/flatchr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Flatchr</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/concludis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />concludis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Warning> **This endpoint is deprecated!** We realized that in practice it was always more about creating _applications_ instead of _candidates_, so we created a new, more aptly named one that you should use instead: [Create application](/ats/v1/post-jobs-job-id-applications) Using it also has the benefit that we return the newly created applicant at the root level, so you can easily store its ID. </Warning> <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "candidate": { "first_name": "Frank", "last_name": "Doe", "company": "Acme Inc.", "title": "Head of Integrations", "email_address": "frank.doe@example.com", "phone_number": "+1-541-754-3010", "gender": "MALE", "salary_expectations": { "amount": 100000, "period": "YEAR" }, "availability_date": "2021-01-01", "location": { "city": "New York", "country": "US" }, "social_links": [ { "url": "https://www.linkedin.com/in/frank-doe-123456789/" }, { "url": "https://twitter.com/frankdoe" } ] }, "application": { "job_id": "BDpgnpZ148nrGh4mYHNxJBgx", "stage_id": "8x3YKRDcuRnwShdh96ShBNn1" }, "screening_question_answers": [ { "question_id": "3phFBNXRweGnDmsU9o2vdPuQ", "answer": "Yes" }, { "question_id": "EYJjhMQT3LtVKXnTbnRT8s6U", "answer": [ "GUzE666zfyjeoCJX6A8n7wh6", "5WPHzzKAv8cx97KtHRUV96U8", "7yZfKGzWigXxxRTygqAfHvyE" ] } ], "attachments": [ { "name": "Frank Doe CV.txt", "data": "SGkgdGhlcmUsIEtvbWJvIGlzIGN1cnJlbnRseSBoaXJpbmcgZW5naW5lZXJzIHRoYXQgbG92ZSB0byB3b3JrIG9uIGRldmVsb3BlciBwcm9kdWN0cy4=", "type": "CV", "content_type": "text/plain" } ] } ```
      *
      * @tags Unified ATS API
      * @name PostAtsCandidates
@@ -5216,7 +6183,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Uploads an attachment file for the specified candidate. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "candidate_id": "GRKdd9dibYKKCrmGRSMJf3wu", "attachment": { "name": "Frank Doe CV.txt", "data": "SGkgdGhlcmUsIEtvbWJvIGlzIGN1cnJlbnRseSBoaXJpbmcgZW5naW5lZXJzIHRoYXQgbG92ZSB0byB3b3JrIG9uIGRldmVsb3BlciBwcm9kdWN0cy4=", "type": "CV", "content_type": "text/plain" } } ```
+     * @description Uploads an attachment file for the specified candidate. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/taleez/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Taleez</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "candidate_id": "GRKdd9dibYKKCrmGRSMJf3wu", "attachment": { "name": "Frank Doe CV.txt", "data": "SGkgdGhlcmUsIEtvbWJvIGlzIGN1cnJlbnRseSBoaXJpbmcgZW5naW5lZXJzIHRoYXQgbG92ZSB0byB3b3JrIG9uIGRldmVsb3BlciBwcm9kdWN0cy4=", "type": "CV", "content_type": "text/plain" } } ```
      *
      * @tags Unified ATS API
      * @name PostAtsCandidatesCandidateIdAttachments
@@ -5249,7 +6216,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description **(⚠️ Deprecated)** Add a result link to a candidate. Please use [add result link to application](/ats/v1/post-applications-application-id-result-links) instead. This can, for example, be used to link a candidate back to a test result/assessment in your application. As not all ATS tools have a "result link" feature, we sometimes repurpose other fields to expose it. This action is deprecated because result links usually concern applications and not candidates. Use endpoint nested under `/applications` instead. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "label": "Assessment Result", "url": "https://example.com/test-results/5BtP1WC1UboS7CF3yxjKcvjG", "details": { "custom_field_name_prefix": "Acme:", "attributes": [ { "key": "Score", "value": "100%" }, { "key": "Time", "value": "2:30h" } ] } } ```
+     * @description Add a result link to a candidate. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jobvite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Jobvite</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Warning> **This endpoint is deprecated!** Please use [add result link to application](/ats/v1/post-applications-application-id-result-links) instead. This can, for example, be used to link a candidate back to a test result/assessment in your application. As not all ATS tools have a "result link" feature, we sometimes repurpose other fields to expose it. This action is deprecated because result links usually concern applications and not candidates. Use endpoint nested under `/applications` instead.. </Warning> <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "label": "Assessment Result", "url": "https://example.com/test-results/5BtP1WC1UboS7CF3yxjKcvjG", "details": { "custom_field_name_prefix": "Acme:", "attributes": [ { "key": "Score", "value": "100%" }, { "key": "Time", "value": "2:30h" } ] } } ```
      *
      * @tags Unified ATS API
      * @name PostAtsCandidatesCandidateIdResultLinks
@@ -5282,7 +6249,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Add a tag to a candidate. Kombo takes care of creating the tag if required, finding out the right ID, and appending it to the list of tags. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "tag": { "name": "Excellent Fit" } } ```
+     * @description Add a tag to a candidate. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Kombo takes care of creating the tag if required, finding out the right ID, and appending it to the list of tags. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "tag": { "name": "Excellent Fit" } } ```
      *
      * @tags Unified ATS API
      * @name PostAtsCandidatesCandidateIdTags
@@ -5315,7 +6282,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Remove a tag from a candidate based on its name. This will also succeed if the tag does not exist on the candidate. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "tag": { "name": "Excellent Fit" } } ```
+     * @description Remove a tag from a candidate based on its name. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> This will also succeed if the tag does not exist on the candidate. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "tag": { "name": "Excellent Fit" } } ```
      *
      * @tags Unified ATS API
      * @name DeleteAtsCandidatesCandidateIdTags
@@ -5348,7 +6315,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all tags.
+     * @description Retrieve all tags. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/flatchr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Flatchr</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified ATS API
      * @name GetAtsTags
@@ -5362,11 +6329,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetAtsTagsParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetAtsTagsParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetAtsTagsParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetAtsTagsParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetAtsTagsParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetAtsTagsParameterRemoteIds;
@@ -5392,7 +6359,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Get all application stages available in the ATS. **(⚠️ Deprecated)** Get all application stages available in the ATS. This is deprecated because most ATS systems have separate sets of stages for each job. We'd recommend using the `stages` property on jobs instead.
+     * @description Get all application stages available in the ATS. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclerecruiting/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle Recruiting Cloud</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/fountain/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Fountain</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/softgarden/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Softgarden</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/dvinci/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />d.vinci</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jobvite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Jobvite</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/umantis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Haufe Umantis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/taleez/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Taleez</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BITE</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/flatchr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Flatchr</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/applicantstack/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />ApplicantStack</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Warning> **This endpoint is deprecated!** Get all application stages available in the ATS. This is deprecated because most ATS systems have separate sets of stages for each job. We'd recommend using the `stages` property on jobs instead.. </Warning> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified ATS API
      * @name GetAtsApplicationStages
@@ -5406,11 +6373,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetAtsApplicationStagesParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetAtsApplicationStagesParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetAtsApplicationStagesParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetAtsApplicationStagesParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetAtsApplicationStagesParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetAtsApplicationStagesParameterRemoteIds;
@@ -5436,7 +6403,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all jobs.
+     * @description Retrieve all jobs. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclerecruiting/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle Recruiting Cloud</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/fountain/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Fountain</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/softgarden/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Softgarden</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/dvinci/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />d.vinci</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jobvite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Jobvite</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/umantis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Haufe Umantis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/taleez/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Taleez</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heyrecruit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Heyrecruit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BITE</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/mysolution/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Mysolution</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/flatchr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Flatchr</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/applicantstack/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />ApplicantStack</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/concludis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />concludis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified ATS API
      * @name GetAtsJobs
@@ -5450,16 +6417,24 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetAtsJobsParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetAtsJobsParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetAtsJobsParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetAtsJobsParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetAtsJobsParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetAtsJobsParameterRemoteIds;
+        /** Filter by a comma-separated list of job codes. */
+        job_codes?: GetAtsJobsParameterJobCodes;
         /** Filter by the `post_url` field. Can be used to find a job based on its public posting URL. */
         post_url?: GetAtsJobsParameterPostUrl;
+        /** **(⚠️ Deprecated - Use the `statuses` filter instead.)** Filter by the `status` field. Can be used to find a job based on its status. */
+        status?: GetAtsJobsParameterStatus;
+        /** Filter by a comma-separated list of `OPEN`, `CLOSED`, `DRAFT`, `ARCHIVED`  */
+        statuses?: GetAtsJobsParameterStatuses;
+        /** Filter by the `name` field. Can be used to find a job by keywords present in the job name. */
+        name_contains?: GetAtsJobsParameterNameContains;
       },
       params: RequestParams = {},
     ) =>
@@ -5482,25 +6457,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Currently in closed beta. <Warning>**This endpoint is currently in closed beta!** We're testing it with selected customers before its public release. If you're interested in learning more or getting early access, please reach out.</Warning>
-     *
-     * @tags Unified ATS API
-     * @name GetAtsJobsJobIdPostings
-     * @summary Get job postings 🦄
-     * @request GET:/ats/jobs/{job_id}/postings
-     * @secure
-     */
-    getAtsJobsJobIdPostings: (jobId: GetAtsJobsJobIdPostingsParameterJobId, params: RequestParams = {}) =>
-      this.request<GetAtsJobsJobIdPostingsSuccessfulResponse, GetAtsJobsJobIdPostingsErrorResponse>({
-        path: `/ats/jobs/${jobId}/postings`,
-        method: "GET",
-        secure: true,
-        format: "json",
-        ...params,
-      }),
-
-    /**
-     * @description Create a new application and candidate for the specified job. The first CV in the attachments will be treated as the resume of the candidate when the tool allows previewing a resume. <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "stage_id": "8x3YKRDcuRnwShdh96ShBNn1", "candidate": { "first_name": "Frank", "last_name": "Doe", "company": "Acme Inc.", "title": "Head of Integrations", "email_address": "frank.doe@example.com", "phone_number": "+1-541-754-3010", "gender": "MALE", "salary_expectations": { "amount": 100000, "period": "YEAR" }, "availability_date": "2021-01-01", "location": { "city": "New York", "country": "US" } }, "attachments": [ { "name": "Frank Doe CV.txt", "data": "SGkgdGhlcmUsIEtvbWJvIGlzIGN1cnJlbnRseSBoaXJpbmcgZW5naW5lZXJzIHRoYXQgbG92ZSB0byB3b3JrIG9uIGRldmVsb3BlciBwcm9kdWN0cy4=", "type": "CV", "content_type": "text/plain" } ], "screening_question_answers": [ { "question_id": "3phFBNXRweGnDmsU9o2vdPuQ", "answer": "Yes" }, { "question_id": "EYJjhMQT3LtVKXnTbnRT8s6U", "answer": [ "GUzE666zfyjeoCJX6A8n7wh6", "5WPHzzKAv8cx97KtHRUV96U8", "7yZfKGzWigXxxRTygqAfHvyE" ] } ] } ```
+     * @description Create a new application and candidate for the specified job. The first CV in the attachments will be treated as the resume of the candidate when the tool allows previewing a resume. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/oraclerecruiting/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Oracle Recruiting Cloud</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/personio/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Personio</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/rexx/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />rexx systems</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/afas/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />AFAS Software</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bamboohr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BambooHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bullhorn/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Bullhorn</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/fountain/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Fountain</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/softgarden/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Softgarden</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/welcometothejungle/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Welcome to the Jungle</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/dvinci/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />d.vinci</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sagehr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sage HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/erecruiter/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />eRecruiter</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/umantis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Haufe Umantis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/taleez/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Taleez</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/heyrecruit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Heyrecruit</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/bite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />BITE</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/homerun/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Homerun</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/mysolution/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Mysolution</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/flatchr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Flatchr</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/concludis/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />concludis</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Create and manage candidates and applications** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "stage_id": "8x3YKRDcuRnwShdh96ShBNn1", "candidate": { "first_name": "Frank", "last_name": "Doe", "company": "Acme Inc.", "title": "Head of Integrations", "email_address": "frank.doe@example.com", "phone_number": "+1-541-754-3010", "gender": "MALE", "salary_expectations": { "amount": 100000, "period": "YEAR" }, "availability_date": "2021-01-01", "location": { "city": "New York", "country": "US" } }, "attachments": [ { "name": "Frank Doe CV.txt", "data": "SGkgdGhlcmUsIEtvbWJvIGlzIGN1cnJlbnRseSBoaXJpbmcgZW5naW5lZXJzIHRoYXQgbG92ZSB0byB3b3JrIG9uIGRldmVsb3BlciBwcm9kdWN0cy4=", "type": "CV", "content_type": "text/plain" } ], "screening_question_answers": [ { "question_id": "3phFBNXRweGnDmsU9o2vdPuQ", "answer": "Yes" }, { "question_id": "EYJjhMQT3LtVKXnTbnRT8s6U", "answer": [ "GUzE666zfyjeoCJX6A8n7wh6", "5WPHzzKAv8cx97KtHRUV96U8", "7yZfKGzWigXxxRTygqAfHvyE" ] } ] } ```
      *
      * @tags Unified ATS API
      * @name PostAtsJobsJobIdApplications
@@ -5533,7 +6490,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Retrieve all users.
+     * @description Retrieve all users. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/lever/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Lever</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/teamtailor/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Teamtailor</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/onlyfy/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Onlyfy</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workable/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workable</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/softgarden/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Softgarden</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/pinpoint/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Pinpoint</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/dvinci/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />d.vinci</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/join/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JOIN</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jobvite/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Jobvite</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/traffit/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />TRAFFIT</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/hrworks/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />HRworks</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/otys/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />OTYS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />RECRU</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/jazzhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />JazzHR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/breezyhr/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Breezy HR</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/sandbox/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Sandbox</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Top level filters use AND, while individual filters use OR if they accept multiple arguments. That means filters will be resolved like this: `(id IN ids) AND (remote_id IN remote_ids)`
      *
      * @tags Unified ATS API
      * @name GetAtsUsers
@@ -5547,11 +6504,11 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         cursor?: GetAtsUsersParameterCursor;
         /** The number of results to return per page. */
         page_size?: GetAtsUsersParameterPageSize;
-        /** Filter the entries based on the modification date. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
+        /** Filter the entries based on the modification date in format YYYY-MM-DDTHH:mm:ss.sssZ. If you want to track entry deletion, also set the `include_deleted=true` query parameter, because otherwise, deleted entries will be hidden. */
         updated_after?: GetAtsUsersParameterUpdatedAfter;
         /** By default, deleted entries are not returned. Use the `include_deleted` query param to include deleted entries too. */
         include_deleted?: GetAtsUsersParameterIncludeDeleted;
-        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. */
+        /** Filter by a comma-separated list of IDs such as `222k7eCGyUdgt2JWZDNnkDs3,B5DVmypWENfU6eMe6gYDyJG3`. Those IDs are validated to be 24 characters long and to exist for this integration in the database. If any of the IDs are don't exist, the endpoint will return a 404 error. */
         ids?: GetAtsUsersParameterIds;
         /** Filter by a comma-separated list of remote IDs. */
         remote_ids?: GetAtsUsersParameterRemoteIds;
@@ -5572,6 +6529,105 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         method: "GET",
         query: query,
         secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
+  assessment = {
+    /**
+     * @description Get all available assessment packages for an integration. This is mainly intended for debugging. As you always need to submit the full list of available packages when using ["set packages"](/assessment/v1/put-packages), there shouldn't ever be a need to call this endpoint in production.
+     *
+     * @tags Unified ATS (Assessment) API
+     * @name GetAssessmentPackages
+     * @summary Get packages
+     * @request GET:/assessment/packages
+     * @secure
+     */
+    getAssessmentPackages: (params: RequestParams = {}) =>
+      this.request<GetAssessmentPackagesSuccessfulResponse, GetAssessmentPackagesErrorResponse>({
+        path: `/assessment/packages`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Replaces the list of available assessment packages. Packages that have been previously submitted through this endpoint but aren't included again will be marked as deleted.
+     *
+     * @tags Unified ATS (Assessment) API
+     * @name PutAssessmentPackages
+     * @summary Set packages
+     * @request PUT:/assessment/packages
+     * @secure
+     */
+    putAssessmentPackages: (data: PutAssessmentPackagesRequestBody, params: RequestParams = {}) =>
+      this.request<PutAssessmentPackagesSuccessfulResponse, PutAssessmentPackagesErrorResponse>({
+        path: `/assessment/packages`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get all open assessment orders of an integration.
+     *
+     * @tags Unified ATS (Assessment) API
+     * @name GetAssessmentOrdersOpen
+     * @summary Get open orders
+     * @request GET:/assessment/orders/open
+     * @secure
+     */
+    getAssessmentOrdersOpen: (
+      query?: {
+        /** An optional cursor string used for pagination. This can be retrieved from the `next` property of the previous page response. */
+        cursor?: GetAssessmentOrdersOpenParameterCursor;
+        /** The number of results to return per page. */
+        page_size?: GetAssessmentOrdersOpenParameterPageSize;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<GetAssessmentOrdersOpenSuccessfulResponse, GetAssessmentOrdersOpenErrorResponse>({
+        path: `/assessment/orders/open`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Updates an assessment order result. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/workday/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Workday</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/successfactors/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SAP SuccessFactors</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/smartrecruiters/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />SmartRecruiters</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/recruitee/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Recruitee</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/greenhouse/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Greenhouse</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/ashby/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Ashby</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> ### Example Request Body ```json { "status": "COMPLETED", "result_url": "https://example.com", "completed_at": "2023-04-04T00:00:00.000Z", "score": 90, "max_score": 100, "attributes": [ { "field": "remarks", "value": "Test completed with passing score" } ] } ```
+     *
+     * @tags Unified ATS (Assessment) API
+     * @name PutAssessmentOrdersAssessmentOrderIdResult
+     * @summary Update order result
+     * @request PUT:/assessment/orders/{assessment_order_id}/result
+     * @secure
+     */
+    putAssessmentOrdersAssessmentOrderIdResult: (
+      assessmentOrderId: PutAssessmentOrdersAssessmentOrderIdResultParameterAssessmentOrderId,
+      data: PutAssessmentOrdersAssessmentOrderIdResultRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<
+        PutAssessmentOrdersAssessmentOrderIdResultSuccessfulResponse,
+        | PutAssessmentOrdersAssessmentOrderIdResultErrorResponse
+        | {
+            status: "error";
+            error: {
+              message: string;
+            };
+          }
+      >({
+        path: `/assessment/orders/${assessmentOrderId}/result`,
+        method: "PUT",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),
@@ -5619,7 +6675,36 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
   };
   custom = {
     /**
-     * @description What DATEV requires to prepare payroll is very specific and currently, as DATEV is not providing "read", this is not part of the unified model. <Note> This endpoint requires the permission **Manage payroll** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "EvLV61zdahkN4ftPJbmPCkdv", "payroll_run": { "date": "2022-05-01" }, "hourly_payments": [ { "hours": 14, "lohnart": 200 }, { "hours": 16, "lohnart": 232 } ], "fixed_payments": [ { "amount": 560, "lohnart": 100 } ] } ```
+     * @description This action allows to send an arbitrary ASCII file directly to DATEV LODAS or Lohn und Gehalt. Kombo adds validation for the file format but not on the content. This action allows you to implement any use case that you might have with DATEV payroll ASCII imports.
+     *
+     * @tags Custom Endpoints
+     * @name PostCustomDatevPassthrough
+     * @summary Write raw DATEV ASCII file
+     * @request POST:/custom/datev/passthrough
+     * @secure
+     */
+    postCustomDatevPassthrough: (data: PostCustomDatevPassthroughRequestBody, params: RequestParams = {}) =>
+      this.request<
+        PostCustomDatevPassthroughSuccessfulResponse,
+        | PostCustomDatevPassthroughErrorResponse
+        | {
+            status: "error";
+            error: {
+              message: string;
+            };
+          }
+      >({
+        path: `/custom/datev/passthrough`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description What DATEV requires to prepare payroll is very specific and currently, as DATEV is not providing "read", this is not part of the unified model. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datev/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV LODAS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datevlug/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV Lohn & Gehalt</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Manage payroll** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "EvLV61zdahkN4ftPJbmPCkdv", "payroll_run": { "date": "2022-05-01" }, "hourly_payments": [ { "hours": 14, "lohnart": 200 }, { "hours": 16, "lohnart": 232 } ], "fixed_payments": [ { "amount": 560, "lohnart": 100 } ] } ```
      *
      * @tags Custom Endpoints
      * @name PutCustomDatevEmployeesEmployeeIdPreparePayroll
@@ -5652,7 +6737,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       }),
 
     /**
-     * @description Sets the compensations for an employee on the specified effective date. Other compensations will end at the effective date. That means, if you would like to add a compensation, you also have to include the compensations that you would like to keep. <Note> This endpoint requires the permission **Manage payroll** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "3bdhemmSP1TPQDGWtRveRot9", "effective_date": "2022-12-01", "compensations": [ { "amount": 4500, "currency": "EUR", "period": "MONTH" } ] } ```
+     * @description Sets the compensations for an employee on the specified effective date. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datev/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV LODAS</li> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/datevlug/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />DATEV Lohn & Gehalt</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> Other compensations will end at the effective date. That means, if you would like to add a compensation, you also have to include the compensations that you would like to keep. <Note> This endpoint requires the permission **Manage payroll** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "3bdhemmSP1TPQDGWtRveRot9", "effective_date": "2022-12-01", "compensations": [ { "amount": 4500, "currency": "EUR", "period": "MONTH", "lohnart": 200 }, { "amount": 30, "currency": "EUR", "period": "HOUR" } ] } ```
      *
      * @tags Custom Endpoints
      * @name PutCustomDatevEmployeesEmployeeIdCompensations
@@ -5761,6 +6846,39 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
           }
       >({
         path: `/custom/datev/push-data/payroll`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Write a payroll supplement to Silae using the supplement code. <Accordion title="Supported integrations" icon="list-check"> This feature is currently available for the following integrations: <ul> <li style={{display: 'flex', alignItems: 'center'}}><img src="https://storage.googleapis.com/kombo-assets/integrations/silae/icon.svg" style={{"width":"16px","height":"16px","marginTop":"0 !important","marginBottom":"0 !important","marginRight":"8px !important"}} />Silae</li> </ul> You'd like to see this feature for another integration? Please reach out! We're always happy to discuss extending our coverage. </Accordion> <Note> This endpoint requires the permission **Manage payroll** to be enabled in [your scope config](/scopes). </Note> ### Example Request Body ```json { "employee_id": "EvLV61zdahkN4ftPJbmPCkdv", "supplement_code": "200", "effective_date": "2024-01-14", "element_amount": 6 } ```
+     *
+     * @tags Custom Endpoints
+     * @name PostCustomSilaeEmployeesEmployeeIdPayrollSupplements
+     * @summary Write Payroll Supplement
+     * @request POST:/custom/silae/employees/{employee_id}/payroll-supplements
+     * @secure
+     */
+    postCustomSilaeEmployeesEmployeeIdPayrollSupplements: (
+      employeeId: PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsParameterEmployeeId,
+      data: PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsRequestBody,
+      params: RequestParams = {},
+    ) =>
+      this.request<
+        PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsSuccessfulResponse,
+        | PostCustomSilaeEmployeesEmployeeIdPayrollSupplementsErrorResponse
+        | {
+            status: "error";
+            error: {
+              message: string;
+            };
+          }
+      >({
+        path: `/custom/silae/employees/${employeeId}/payroll-supplements`,
         method: "POST",
         body: data,
         secure: true,
