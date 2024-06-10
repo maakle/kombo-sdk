@@ -35,3 +35,19 @@ const result = await komboApi.hris.getHrisAbsenceTypes(
 );
 console.log(result.data.data.results);
 ```
+
+
+## Development
+
+### How to build a new version of the SDK
+
+Step 0: Download the openapi schema (`openapi.json`) from Kombo. And put it into this folder here
+
+Step 1: Build the Api.ts file with new open api schema
+`npx swagger-typescript-api -p openapi.json -o`
+
+Step 2: cd into sdk folder, update package.json and bump version e.g. `1.X.0`
+
+Step 3: Run `yarn build` to build new Api.js file in dist folder
+
+Step 4: Run `yarn publish` to publish to npm. You need to define version and also cancel once published
