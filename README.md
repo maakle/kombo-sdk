@@ -44,10 +44,10 @@ console.log(result.data.data.results);
 Step 0: Download the latest openapi schema (`openapi.json`) from Kombo's Website ([Link](https://api.kombo.dev/openapi.json)). And put it into this folder here
 
 Step 1: Build the Api.ts file with new open api schema
-`npx swagger-typescript-api -p openapi.json -o`
+`npx swagger-typescript-api generate -p openapi.json -o sdk`
 
 Step 2: cd into sdk folder, update package.json and bump version e.g. `1.X.0`
 
 Step 3: Run `yarn build` to build new Api.js file in dist folder
 
-Step 4: Run `yarn publish` to publish to npm. You need to define version and also cancel once published
+Step 4: Run `yarn publish` to publish to npm. You need to define the same version from step 2 and cancel once published
