@@ -41,7 +41,7 @@ console.log(result.data.data.results);
 
 ### How to build a new version of the SDK
 
-Step 0: Download the openapi schema (`openapi.json`) from Kombo. And put it into this folder here
+Step 0: Download the latest openapi schema (`openapi.json`) from Kombo's Website ([Link](https://api.kombo.dev/openapi.json)). And put it into this folder here
 
 Step 1: Build the Api.ts file with new open api schema
 `npx swagger-typescript-api -p openapi.json -o`
