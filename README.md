@@ -1,5 +1,10 @@
 # Kombo Typescript SDK
 
+> [!WARNING]
+> Kombo now offers [an official TypeScript SDK](https://github.com/kombohq/typescript-sdk) ([`@kombo-api/sdk`](https://www.npmjs.com/package/@kombo-api/sdk)).
+>
+> This package is deprecated and will not receive any further updates.
+
 This is an unofficial Typescript SDK for the [Kombo.dev API](https://kombo.dev)
 
 ## Installation
